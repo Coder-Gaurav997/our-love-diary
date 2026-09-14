@@ -164,7 +164,7 @@ def imgs_of(m: dict) -> list:
     return [p for p in norm(m)["images"] if p]
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  PARTICLES
+#  PARTICLES + AURORA + BOKEH
 # ═══════════════════════════════════════════════════════════════════════════
 rng = random.Random(42)
 def _p(cls, n):
@@ -175,8 +175,23 @@ def _p(cls, n):
         f'--s:{rng.uniform(2 if cls == "dot" else 9, 5 if cls == "dot" else 28):.1f}px;'
         f'--x:{rng.uniform(-90,90):.0f}px"></span>' for _ in range(n))
 
-PARTICLES = (f'<div class="living-bg" id="living-bg">'
-             f'{_p("bubble",20)}{_p("leaf",16)}{_p("dot",45)}</div>')
+def _bokeh(n=10):
+    return "".join(
+        f'<span class="bokeh" style="left:{rng.uniform(0,100):.1f}%;'
+        f'top:{rng.uniform(0,100):.1f}%;--bs:{rng.uniform(28,70):.0f}px;'
+        f'--bd:{rng.uniform(0,8):.1f}s;--bt:{rng.uniform(6,11):.1f}s"></span>'
+        for _ in range(n))
+
+PARTICLES = (
+    '<div class="living-bg" id="living-bg">'
+    '<div class="aurora a1"></div>'
+    '<div class="aurora a2"></div>'
+    '<div class="aurora a3"></div>'
+    f'{_bokeh(10)}'
+    f'{_p("bubble",20)}{_p("leaf",16)}{_p("dot",45)}'
+    '</div>'
+    '<div class="cursor-glow" id="cursor-glow"></div>'
+)
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  CSS
@@ -217,6 +232,57 @@ st.markdown("""
   .block-container{padding-top:2rem;max-width:1080px;position:relative;z-index:2}
   header[data-testid="stHeader"]{background:transparent}footer{visibility:hidden}
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1;transition:transform .15s linear}
+    /* ═══ AURORA WAVES ═══ */
+  .aurora{position:absolute;width:70vmax;height:70vmax;border-radius:50%;
+    filter:blur(85px);opacity:.55;will-change:transform;pointer-events:none}
+  .aurora.a1{top:-30%;left:-20%;
+    background:radial-gradient(circle,rgba(255,140,190,.75),transparent 65%);
+    animation:auroraFloat 28s ease-in-out infinite}
+  .aurora.a2{top:10%;right:-30%;
+    background:radial-gradient(circle,rgba(140,170,255,.7),transparent 65%);
+    animation:auroraFloat 34s ease-in-out -8s infinite}
+  .aurora.a3{bottom:-30%;left:20%;
+    background:radial-gradient(circle,rgba(170,230,255,.65),transparent 65%);
+    animation:auroraFloat 30s ease-in-out -16s infinite}
+  @keyframes auroraFloat{
+    0%,100%{transform:translate(0,0) scale(1)}
+    33%{transform:translate(8%,6%) scale(1.12)}
+    66%{transform:translate(-7%,-5%) scale(.95)}}
+
+  /* ═══ BOKEH LIGHT SPOTS ═══ */
+  .bokeh{position:absolute;width:var(--bs);height:var(--bs);border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(255,210,230,.5) 35%,transparent 70%);
+    filter:blur(4px);opacity:0;pointer-events:none;
+    animation:bokehFloat var(--bt) ease-in-out var(--bd) infinite alternate}
+  @keyframes bokehFloat{
+    0%{opacity:.35;transform:translate(0,0) scale(1)}
+    100%{opacity:.85;transform:translate(20px,-30px) scale(1.25)}}
+
+  /* ═══ CURSOR-FOLLOWING GLOW ═══ */
+  .cursor-glow{position:fixed;top:0;left:0;width:520px;height:520px;border-radius:50%;
+    pointer-events:none;
+    background:radial-gradient(circle,rgba(255,180,215,.35),rgba(150,180,255,.18) 45%,transparent 72%);
+    filter:blur(30px);z-index:1;will-change:transform}
+
+  /* ═══ TITLE GLOW PULSE ═══ */
+  h1.love-title{
+    animation:fadeInDown 1s cubic-bezier(.2,.8,.2,1) both,
+              titleGlow 4s ease-in-out 1.2s infinite}
+  @keyframes titleGlow{
+    0%,100%{text-shadow:0 3px 14px rgba(11,46,26,.35),0 0 6px rgba(255,255,255,.6)}
+    50%{text-shadow:0 3px 18px rgba(11,46,26,.5),0 0 26px rgba(255,200,220,.9),
+        0 0 46px rgba(255,140,190,.55)}}
+
+  /* ═══ SUBTLE 3D TILT ON CARDS ═══ */
+  .tl-card{
+    transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .35s ease,border-color .35s ease;
+    transform-style:preserve-3d}
+
+  /* ═══ CONFETTI HEART KEYFRAMES ═══ */
+  @keyframes confettiFloat{
+    0%{opacity:1;transform:translate(-50%,-50%) scale(.8)}
+    100%{opacity:0;
+      transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.4) rotate(15deg)}}
   .bubble{position:absolute;bottom:-50px;width:var(--s);height:var(--s);border-radius:50%;
     background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.35) 28%,rgba(180,220,255,.20) 55%,rgba(255,255,255,.05) 100%);
     border:1px solid rgba(255,255,255,.55);
@@ -435,10 +501,74 @@ st.markdown("""
 
 st.markdown(PARTICLES, unsafe_allow_html=True)
 components.html("""<script>
-(function(){const p=window.parent.document,bg=p.getElementById('living-bg');if(!bg)return;
-let r;function s(){cancelAnimationFrame(r);r=requestAnimationFrame(()=>{
-const y=p.documentElement.scrollTop||p.body.scrollTop||0;bg.style.transform='translateY('+(y*0.35)+'px)';});}
-p.addEventListener('scroll',s,{passive:true});})();
+(function(){
+  const p = window.parent.document;
+
+  /* ── Parallax on background layer ── */
+  const bg = p.getElementById('living-bg');
+  if (bg) {
+    let r;
+    function onScroll(){
+      cancelAnimationFrame(r);
+      r = requestAnimationFrame(() => {
+        const y = p.documentElement.scrollTop || p.body.scrollTop || 0;
+        bg.style.transform = 'translateY(' + (y * 0.35) + 'px)';
+      });
+    }
+    p.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  /* ── Cursor-following glow ── */
+  const glow = p.getElementById('cursor-glow');
+  if (glow) {
+    let gx = 0, gy = 0, tx = 0, ty = 0;
+    p.addEventListener('mousemove', e => { tx = e.clientX; ty = e.clientY; });
+    (function anim(){
+      gx += (tx - gx) * 0.12;
+      gy += (ty - gy) * 0.12;
+      glow.style.transform = `translate(${gx}px, ${gy}px) translate(-50%,-50%)`;
+      requestAnimationFrame(anim);
+    })();
+  }
+
+  /* ── 3D tilt on timeline cards ── */
+  p.addEventListener('mousemove', e => {
+    const card = e.target.closest && e.target.closest('.tl-card');
+    if (!card) return;
+    const rc = card.getBoundingClientRect();
+    const x = (e.clientX - rc.left) / rc.width - 0.5;
+    const y = (e.clientY - rc.top) / rc.height - 0.5;
+    card.style.transform =
+      `perspective(700px) rotateY(${x * 7}deg) rotateX(${-y * 7}deg) translateY(-5px) scale(1.03)`;
+  });
+  p.addEventListener('mouseout', e => {
+    const card = e.target.closest && e.target.closest('.tl-card');
+    if (card) card.style.transform = '';
+  });
+
+  /* ── Confetti hearts on click ── */
+  p.addEventListener('click', e => {
+    const t = e.target;
+    if (t.closest('button, input, textarea, select, [data-testid="stFileUploaderDropzone"]')) return;
+    const glyphs = ['❤️','💖','💕','💗','💘','🌸'];
+    for (let i = 0; i < 5; i++) {
+      const h = p.createElement('span');
+      h.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+      h.style.cssText =
+        'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;' +
+        'font-size:' + (14 + Math.random() * 12) + 'px;pointer-events:none;z-index:99999;' +
+        'animation:confettiFloat ' + (1 + Math.random() * 0.8) + 's ease-out forwards;' +
+        'transform:translate(-50%,-50%);will-change:transform,opacity;';
+      h.style.setProperty('--dx', (Math.random() - 0.5) * 220 + 'px');
+      h.style.setProperty('--dy', -(60 + Math.random() * 120) + 'px');
+      p.body.appendChild(h);
+      setTimeout(() => h.remove(), 2200);
+    }
+  });
+
+  window.parent.postMessage({ isStreamlitMessage: true,
+    type: 'streamlit:setFrameHeight', height: 0 }, '*');
+})();
 </script>""", height=0)
 
 # ── Top bar ──────────────────────────────────────────────────────────────
