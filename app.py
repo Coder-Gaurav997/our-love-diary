@@ -183,6 +183,34 @@ PARTICLES = (f'<div class="living-bg" id="living-bg">'
 # ═══════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
+    /* Hide the top header bar (Share, Star, Edit, GitHub, ⋮ menu) */
+  header[data-testid="stHeader"] {
+      display: none !important;
+      visibility: hidden !important;
+  }
+
+  /* Hide the bottom-right "Manage app" button */
+  [data-testid="manage-app-button"] {
+      display: none !important;
+      visibility: hidden !important;
+  }
+
+  /* Hide the hamburger menu (⋮) */
+  #MainMenu {
+      display: none !important;
+      visibility: hidden !important;
+  }
+
+  /* Hide the "Made with Streamlit" footer */
+  footer {
+      display: none !important;
+      visibility: hidden !important;
+  }
+
+  /* Hide the Deploy button if it appears */
+  .stDeployButton {
+      display: none !important;
+  }
   @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@1,800&family=Lora:ital,wght@1,700&family=Inter:wght@500;600;700&family=Dancing+Script:wght@700&display=swap');
   :root{color-scheme:light only}
   .stApp{background:linear-gradient(110deg,#F28BA8 0%,#76B7E5 100%);background-attachment:fixed}
