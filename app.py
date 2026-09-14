@@ -147,7 +147,7 @@ def imgs_of(m: dict) -> list:
     return [p for p in norm(m)["images"] if p]
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  PARTICLES + AURORA + BOKEH
+#  PARTICLES — reduced counts for performance
 # ═══════════════════════════════════════════════════════════════════════════
 rng = random.Random(42)
 def _p(cls, n):
@@ -158,7 +158,7 @@ def _p(cls, n):
         f'--s:{rng.uniform(2 if cls == "dot" else 9, 5 if cls == "dot" else 28):.1f}px;'
         f'--x:{rng.uniform(-90,90):.0f}px"></span>' for _ in range(n))
 
-def _bokeh(n=10):
+def _bokeh(n=6):
     return "".join(
         f'<span class="bokeh" style="left:{rng.uniform(0,100):.1f}%;'
         f'top:{rng.uniform(0,100):.1f}%;--bs:{rng.uniform(28,70):.0f}px;'
@@ -170,14 +170,14 @@ PARTICLES = (
     '<div class="aurora a1"></div>'
     '<div class="aurora a2"></div>'
     '<div class="aurora a3"></div>'
-    f'{_bokeh(10)}'
-    f'{_p("bubble",20)}{_p("leaf",16)}{_p("dot",45)}'
+    f'{_bokeh(6)}'
+    f'{_p("bubble",10)}{_p("leaf",8)}{_p("dot",20)}'
     '</div>'
     '<div class="cursor-glow" id="cursor-glow"></div>'
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  CSS — HIGH-CONTRAST EDITION
+#  CSS — HIGH-CONTRAST + PERFORMANCE-TUNED
 # ═══════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
@@ -192,19 +192,21 @@ st.markdown("""
 
   :root{color-scheme:light only}
 
-  /* ── Base background: slightly deeper so text pops ─────────────── */
   .stApp{
     background:linear-gradient(110deg,#e57b9a 0%,#5a9fd4 100%);
     background-attachment:fixed}
   .block-container{padding-top:2rem;max-width:1080px;position:relative;z-index:3}
 
-  /* ═══ BACKGROUND LAYER ═══════════════════════════════════════════ */
+  /* ═══ BACKGROUND LAYER (GPU-isolated) ═══════════════════════════ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
-    z-index:1;transition:transform .15s linear}
+    z-index:1;transition:transform .15s linear;
+    contain:strict;will-change:transform;transform:translateZ(0)}
 
-  /* Aurora — toned down so it's atmosphere, not overpowering */
-  .aurora{position:absolute;width:70vmax;height:70vmax;border-radius:50%;
-    filter:blur(95px);opacity:.35;will-change:transform;pointer-events:none}
+  /* Aurora — smaller, cheaper blur */
+  .aurora{position:absolute;width:48vmax;height:48vmax;border-radius:50%;
+    filter:blur(45px);opacity:.30;pointer-events:none;
+    will-change:transform;transform:translateZ(0);backface-visibility:hidden;
+    contain:strict}
   .aurora.a1{top:-30%;left:-20%;
     background:radial-gradient(circle,rgba(255,140,190,.75),transparent 65%);
     animation:auroraFloat 28s ease-in-out infinite}
@@ -215,31 +217,34 @@ st.markdown("""
     background:radial-gradient(circle,rgba(170,230,255,.65),transparent 65%);
     animation:auroraFloat 30s ease-in-out -16s infinite}
   @keyframes auroraFloat{
-    0%,100%{transform:translate(0,0) scale(1)}
-    33%{transform:translate(8%,6%) scale(1.12)}
-    66%{transform:translate(-7%,-5%) scale(.95)}}
+    0%,100%{transform:translate3d(0,0,0) scale(1)}
+    33%{transform:translate3d(8%,6%,0) scale(1.12)}
+    66%{transform:translate3d(-7%,-5%,0) scale(.95)}}
 
-  /* Bokeh — softer */
+  /* Bokeh — no blur filter (gradient is soft enough) */
   .bokeh{position:absolute;width:var(--bs);height:var(--bs);border-radius:50%;
     background:radial-gradient(circle,rgba(255,255,255,.85) 0%,rgba(255,210,230,.4) 35%,transparent 70%);
-    filter:blur(4px);opacity:0;pointer-events:none;
+    opacity:0;pointer-events:none;
+    will-change:opacity,transform;transform:translateZ(0);
     animation:bokehFloat var(--bt) ease-in-out var(--bd) infinite alternate}
   @keyframes bokehFloat{
-    0%{opacity:.25;transform:translate(0,0) scale(1)}
-    100%{opacity:.65;transform:translate(20px,-30px) scale(1.25)}}
+    0%{opacity:.25;transform:translate3d(0,0,0) scale(1)}
+    100%{opacity:.65;transform:translate3d(20px,-30px,0) scale(1.25)}}
 
-  /* Cursor glow — softer */
-  .cursor-glow{position:fixed;top:0;left:0;width:480px;height:480px;border-radius:50%;
+  /* Cursor glow — no filter blur, smaller */
+  .cursor-glow{position:fixed;top:0;left:0;width:360px;height:360px;border-radius:50%;
     pointer-events:none;
-    background:radial-gradient(circle,rgba(255,180,215,.28),rgba(150,180,255,.14) 45%,transparent 72%);
-    filter:blur(35px);z-index:1;will-change:transform}
+    background:radial-gradient(circle,rgba(255,180,215,.30) 0%,rgba(150,180,255,.15) 45%,transparent 72%);
+    z-index:1;will-change:transform;
+    transform:translate3d(-9999px,-9999px,0)}
 
-  /* ═══ PARTICLE ANIMATIONS ════════════════════════════════════════ */
+  /* ═══ PARTICLE ANIMATIONS (GPU-hinted) ══════════════════════════ */
   .bubble{position:absolute;bottom:-50px;width:var(--s);height:var(--s);border-radius:50%;
     background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.35) 28%,rgba(180,220,255,.20) 55%,rgba(255,255,255,.05) 100%);
     border:1px solid rgba(255,255,255,.55);
     box-shadow:inset -2px -3px 6px rgba(255,255,255,.55),inset 2px 2px 4px rgba(120,180,240,.35),0 0 10px rgba(255,255,255,.45);
-    animation:rise var(--t) linear var(--d) infinite;opacity:0}
+    animation:rise var(--t) linear var(--d) infinite;opacity:0;
+    will-change:transform,opacity;transform:translateZ(0)}
   @keyframes rise{
     0%{transform:translate3d(0,0,0) scale(.5);opacity:0}10%{opacity:.95}
     50%{transform:translate3d(calc(var(--x)*.6),-50vh,0) scale(1);opacity:.85}90%{opacity:.55}
@@ -247,14 +252,16 @@ st.markdown("""
   .leaf{position:absolute;top:-50px;width:var(--s);height:calc(var(--s)*.6);
     background:linear-gradient(135deg,#a4e07a 0%,#4caf50 55%,#2e7d32 100%);border-radius:50% 0 50% 0;
     box-shadow:inset -1px -1px 3px rgba(0,0,0,.20),inset 1px 1px 2px rgba(255,255,255,.35),0 3px 6px rgba(0,0,0,.15);
-    animation:fall-leaf var(--t) linear var(--d) infinite;opacity:0}
+    animation:fall-leaf var(--t) linear var(--d) infinite;opacity:0;
+    will-change:transform,opacity;transform:translateZ(0)}
   @keyframes fall-leaf{
     0%{transform:translate3d(0,-10vh,0) rotate(0) rotateY(0);opacity:0}8%{opacity:.9}
     50%{transform:translate3d(calc(var(--x)*.5),50vh,0) rotate(360deg) rotateY(180deg)}90%{opacity:.75}
     100%{transform:translate3d(var(--x),115vh,0) rotate(720deg) rotateY(360deg);opacity:0}}
   .dot{position:absolute;width:var(--s);height:var(--s);border-radius:50%;background:#fff;
     box-shadow:0 0 5px rgba(255,255,255,.95),0 0 12px rgba(255,246,200,.85),0 0 22px rgba(255,240,180,.55);
-    animation:twinkle var(--t) ease-in-out var(--d) infinite;opacity:0}
+    animation:twinkle var(--t) ease-in-out var(--d) infinite;opacity:0;
+    will-change:transform,opacity;transform:translateZ(0)}
   @keyframes twinkle{0%,100%{opacity:0;transform:scale(.4)}50%{opacity:1;transform:scale(1.35)}}
 
   @keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
@@ -271,7 +278,7 @@ st.markdown("""
       0 0 28px rgba(255,220,240,1),
       0 0 52px rgba(255,140,190,.75)}}
 
-  /* ═══ TITLE — dark green with thick white halo ═══════════════════ */
+  /* ═══ TITLE ═════════════════════════════════════════════════════ */
   h1.love-title{
     font-family:'Great Vibes',cursive !important;text-align:center;font-size:5.5rem;
     font-weight:600;color:#03170E;margin:0;
@@ -284,7 +291,7 @@ st.markdown("""
     animation:fadeInDown 1s cubic-bezier(.2,.8,.2,1) both,
               titleGlow 4s ease-in-out 1.2s infinite}
 
-  /* ═══ SUBHEADING — solid white pill, dark text ══════════════════ */
+  /* ═══ SUBHEADING ════════════════════════════════════════════════ */
   p.love-sub{
     font-family:'Cormorant Garamond',serif !important;
     font-weight:800;font-style:italic;text-align:center;
@@ -294,8 +301,8 @@ st.markdown("""
     border:2px solid #c2185b;
     border-radius:999px;
     background:rgba(255,255,255,.88);
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
     box-shadow:
       0 8px 22px rgba(11,46,26,.25),
       0 0 12px rgba(255,214,232,.9),
@@ -319,14 +326,14 @@ st.markdown("""
   .tl-item.left .tl-heart{right:-17px}.tl-item.right .tl-heart{left:-17px}
   .tl-heart svg{width:100%;height:100%}
 
-  /* ═══ TILES — glass with strong opacity so text stays crisp ═════ */
+  /* ═══ TILES ═════════════════════════════════════════════════════ */
   a.tl-card,a.tl-card:visited,a.tl-card:hover,a.tl-card:active{
     text-decoration:none;color:inherit}
   .tl-card{
     display:inline-block;padding:18px 26px;border-radius:18px;
     background:rgba(255,255,255,.82);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px) saturate(150%);
+    -webkit-backdrop-filter:blur(6px) saturate(150%);
     border:2px solid #0B2E1A;
     box-shadow:
       0 10px 30px rgba(11,46,26,.30),
@@ -335,7 +342,9 @@ st.markdown("""
                box-shadow .35s ease,border-color .35s ease,background .35s ease;
     text-align:inherit;position:relative;overflow:hidden;cursor:pointer;
     min-width:240px;min-height:96px;
-    transform-style:preserve-3d}
+    transform-style:preserve-3d;
+    will-change:transform;
+    contain:layout paint}
   .tl-card::before{content:'';position:absolute;inset:0;
     background:radial-gradient(circle at 15% 20%,rgba(200,150,230,.18) 0%,transparent 60%);
     pointer-events:none}
@@ -364,11 +373,11 @@ st.markdown("""
     border-radius:999px;background:#ffd9e8;
     border:1.5px solid #7a0a1e}
 
-  /* ═══ EMPTY / NO-PHOTO CARDS ════════════════════════════════════ */
+  /* ═══ EMPTY / NO-PHOTO ══════════════════════════════════════════ */
   .empty-state{max-width:640px;margin:40px auto;padding:50px 40px;border-radius:24px;
     background:rgba(255,255,255,.85);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px) saturate(150%);
+    -webkit-backdrop-filter:blur(6px) saturate(150%);
     border:2px dashed #0B2E1A;
     box-shadow:0 14px 40px rgba(11,46,26,.28),
                inset 0 1px 0 rgba(255,255,255,.95);
@@ -385,8 +394,8 @@ st.markdown("""
   .no-photo{max-width:820px;margin:24px auto 22px auto;padding:56px 30px;
     border-radius:20px;text-align:center;
     background:rgba(255,255,255,.85);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px) saturate(150%);
+    -webkit-backdrop-filter:blur(6px) saturate(150%);
     border:2px dashed #0B2E1A;
     box-shadow:0 12px 32px rgba(11,46,26,.28),
                inset 0 1px 0 rgba(255,255,255,.95)}
@@ -396,8 +405,8 @@ st.markdown("""
   /* ═══ ENDING CARD ═══════════════════════════════════════════════ */
   .ending-card{max-width:720px;margin:30px auto 20px auto;padding:34px 40px;border-radius:24px;
     background:rgba(255,255,255,.85);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px) saturate(150%);
+    -webkit-backdrop-filter:blur(6px) saturate(150%);
     border:2px dashed #0B2E1A;
     box-shadow:0 14px 40px rgba(11,46,26,.30),
                inset 0 1px 0 rgba(255,255,255,.95);
@@ -465,8 +474,8 @@ st.markdown("""
 
   .detail-about{max-width:820px;margin:0 auto;padding:26px 30px;border-radius:20px;
     background:rgba(255,255,255,.88);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px) saturate(150%);
+    -webkit-backdrop-filter:blur(6px) saturate(150%);
     border:2px solid #0B2E1A;
     box-shadow:0 12px 32px rgba(11,46,26,.28),
                inset 0 1px 0 rgba(255,255,255,.95);
@@ -554,8 +563,8 @@ st.markdown("""
   /* ═══ ADD/EDIT PANEL ════════════════════════════════════════════ */
   .add-panel{max-width:720px;margin:10px auto 30px auto;padding:26px 30px;border-radius:22px;
     background:rgba(255,255,255,.88);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px) saturate(150%);
+    -webkit-backdrop-filter:blur(6px) saturate(150%);
     border:2px solid #0B2E1A;
     box-shadow:0 14px 36px rgba(11,46,26,.3),
                inset 0 1px 0 rgba(255,255,255,.95);
@@ -583,8 +592,8 @@ st.markdown("""
 
   .danger-box{max-width:720px;margin:16px auto;padding:22px 26px;border-radius:18px;
     background:rgba(255,240,246,.9);
-    backdrop-filter:blur(16px) saturate(160%);
-    -webkit-backdrop-filter:blur(16px) saturate(160%);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
     border:2px dashed #c2185b;
     box-shadow:0 12px 32px rgba(194,24,91,.28),
                inset 0 1px 0 rgba(255,255,255,.9);
@@ -609,67 +618,127 @@ st.markdown("""
     h1.love-title{font-size:3.6rem;-webkit-text-stroke:3px #fff}
     .love-note-text{font-size:2.8rem}.love-note-sub{font-size:.9rem;letter-spacing:.25em}
     .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2rem !important}}
+
+  /* ═══ REDUCED MOTION ════════════════════════════════════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    .aurora, .bokeh, .bubble, .leaf, .dot,
+    .cursor-glow, .tl-heart, .ending-heart, .ending-dots {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown(PARTICLES, unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  OPTIMIZED JS — rAF-throttled, cached rects, passive listeners
+# ═══════════════════════════════════════════════════════════════════════════
 components.html("""<script>
 (function(){
   const p = window.parent.document;
+
+  /* ── Parallax (rAF-throttled) ── */
   const bg = p.getElementById('living-bg');
   if (bg) {
-    let r;
-    function onScroll(){
-      cancelAnimationFrame(r);
-      r = requestAnimationFrame(() => {
+    let r = false;
+    p.addEventListener('scroll', () => {
+      if (r) return;
+      r = true;
+      requestAnimationFrame(() => {
         const y = p.documentElement.scrollTop || p.body.scrollTop || 0;
-        bg.style.transform = 'translateY(' + (y * 0.35) + 'px)';
+        bg.style.transform = 'translate3d(0,' + (y * 0.35) + 'px,0)';
+        r = false;
       });
-    }
-    p.addEventListener('scroll', onScroll, { passive: true });
+    }, { passive: true });
   }
+
+  /* ── Cursor glow (rAF + idle skip) ── */
   const glow = p.getElementById('cursor-glow');
   if (glow) {
-    let gx = 0, gy = 0, tx = 0, ty = 0;
-    p.addEventListener('mousemove', e => { tx = e.clientX; ty = e.clientY; });
+    let gx = 0, gy = 0, tx = 0, ty = 0, active = false;
+    p.addEventListener('mousemove', e => {
+      tx = e.clientX; ty = e.clientY; active = true;
+    }, { passive: true });
     (function anim(){
-      gx += (tx - gx) * 0.12;
-      gy += (ty - gy) * 0.12;
-      glow.style.transform = `translate(${gx}px, ${gy}px) translate(-50%,-50%)`;
+      if (active) {
+        gx += (tx - gx) * 0.14;
+        gy += (ty - gy) * 0.14;
+        if (Math.abs(tx - gx) < 0.5 && Math.abs(ty - gy) < 0.5) {
+          gx = tx; gy = ty; active = false;
+        }
+        glow.style.transform =
+          'translate3d(' + (gx - 180) + 'px,' + (gy - 180) + 'px,0)';
+      }
       requestAnimationFrame(anim);
     })();
   }
-  p.addEventListener('mousemove', e => {
-    const card = e.target.closest && e.target.closest('.tl-card');
-    if (!card) return;
-    const rc = card.getBoundingClientRect();
-    const x = (e.clientX - rc.left) / rc.width - 0.5;
-    const y = (e.clientY - rc.top) / rc.height - 0.5;
-    card.style.transform =
-      `perspective(700px) rotateY(${x * 7}deg) rotateX(${-y * 7}deg) translateY(-5px) scale(1.03)`;
-  });
-  p.addEventListener('mouseout', e => {
-    const card = e.target.closest && e.target.closest('.tl-card');
-    if (card) card.style.transform = '';
-  });
+
+  /* ── 3D tilt (cached rect, rAF-throttled, desktop only) ── */
+  const isTouch = matchMedia('(hover: none)').matches;
+  if (!isTouch) {
+    let tiltCard = null, tiltRect = null;
+    let lastX = 0, lastY = 0, tiltRaf = false;
+
+    p.addEventListener('mouseover', e => {
+      const c = e.target.closest && e.target.closest('.tl-card');
+      if (c && c !== tiltCard) {
+        tiltCard = c;
+        tiltRect = c.getBoundingClientRect();
+      }
+    }, { passive: true });
+
+    p.addEventListener('mouseout', e => {
+      const c = e.target.closest && e.target.closest('.tl-card');
+      if (c && c === tiltCard) {
+        c.style.transform = '';
+        tiltCard = null; tiltRect = null;
+      }
+    }, { passive: true });
+
+    p.addEventListener('mousemove', e => {
+      if (!tiltCard) return;
+      lastX = e.clientX; lastY = e.clientY;
+      if (tiltRaf) return;
+      tiltRaf = true;
+      requestAnimationFrame(() => {
+        tiltRaf = false;
+        if (!tiltCard || !tiltRect) return;
+        const x = (lastX - tiltRect.left) / tiltRect.width - 0.5;
+        const y = (lastY - tiltRect.top) / tiltRect.height - 0.5;
+        tiltCard.style.transform =
+          'perspective(700px) rotateY(' + (x * 6) + 'deg) rotateX(' + (-y * 6) +
+          'deg) translateY(-5px) scale(1.02)';
+      });
+    }, { passive: true });
+  }
+
+  /* ── Confetti (throttled to 1 burst / 120ms) ── */
+  let lastBurst = 0;
   p.addEventListener('click', e => {
     const t = e.target;
     if (t.closest('button, input, textarea, select, [data-testid="stFileUploaderDropzone"]')) return;
+    const now = Date.now();
+    if (now - lastBurst < 120) return;
+    lastBurst = now;
+
     const glyphs = ['❤️','💖','💕','💗','💘','🌸'];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const h = p.createElement('span');
       h.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
       h.style.cssText =
         'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;' +
-        'font-size:' + (14 + Math.random() * 12) + 'px;pointer-events:none;z-index:99999;' +
-        'animation:confettiFloat ' + (1 + Math.random() * 0.8) + 's ease-out forwards;' +
+        'font-size:' + (14 + Math.random() * 10) + 'px;pointer-events:none;z-index:99999;' +
+        'animation:confettiFloat ' + (0.9 + Math.random() * 0.6) + 's ease-out forwards;' +
         'transform:translate(-50%,-50%);will-change:transform,opacity;';
-      h.style.setProperty('--dx', (Math.random() - 0.5) * 220 + 'px');
-      h.style.setProperty('--dy', -(60 + Math.random() * 120) + 'px');
+      h.style.setProperty('--dx', (Math.random() - 0.5) * 180 + 'px');
+      h.style.setProperty('--dy', -(60 + Math.random() * 100) + 'px');
       p.body.appendChild(h);
-      setTimeout(() => h.remove(), 2200);
+      setTimeout(() => h.remove(), 1600);
     }
-  });
+  }, { passive: true });
+
   window.parent.postMessage({ isStreamlitMessage: true,
     type: 'streamlit:setFrameHeight', height: 0 }, '*');
 })();
@@ -695,8 +764,8 @@ components.html(f"""<style>
   @keyframes fadeInUp{{from{{opacity:0;transform:translateY(24px)}}to{{opacity:1;transform:none}}}}
   .days-counter{{display:inline-flex;align-items:center;gap:14px;padding:14px 28px;border-radius:999px;
     background:rgba(255,255,255,.92);
-    backdrop-filter:blur(14px) saturate(1.4);
-    -webkit-backdrop-filter:blur(14px) saturate(1.4);
+    backdrop-filter:blur(6px) saturate(1.4);
+    -webkit-backdrop-filter:blur(6px) saturate(1.4);
     border:2px solid #0B2E1A;
     box-shadow:0 12px 34px rgba(11,46,26,.28),
       inset 0 1px 1px rgba(255,255,255,1),
