@@ -1,4 +1,4 @@
-"""🌿 Avrav Love Diary — Supabase edition (optimized + high-contrast)."""
+"""🌿 Avrav Love Diary — Supabase edition (max contrast, no wash)."""
 import pathlib, random, uuid
 from datetime import datetime
 import streamlit as st
@@ -122,7 +122,7 @@ def img_src(path): return path or ""
 def imgs_of(m): return [p for p in norm(m)["images"] if p]
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  PARTICLES
+#  PARTICLES — only bokeh + bubbles + leaves + dots (no aurora, no cursor glow)
 # ═══════════════════════════════════════════════════════════════════════════
 rng = random.Random(42)
 def _p(cls, n):
@@ -142,61 +142,38 @@ def _bokeh(n=4):
 
 PARTICLES = (
     '<div class="living-bg" id="living-bg">'
-    '<div class="aurora"></div>'
     f'{_bokeh(4)}'
     f'{_p("bubble",8)}{_p("leaf",6)}{_p("dot",14)}'
     '</div>'
-    '<div class="cursor-glow" id="cursor-glow"></div>'
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  CSS — HIGH-CONTRAST EDITION
+#  CSS — MAX CONTRAST (solid cards, no washes)
 # ═══════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@1,800&family=Lora:ital,wght@1,700&family=Inter:wght@500;600;700&family=Dancing+Script:wght@700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@1,800&family=Lora:ital,wght@1,700&family=Inter:wght@500;600;700;800&family=Dancing+Script:wght@700&display=swap');
 
   header[data-testid="stHeader"],[data-testid="manage-app-button"],
   #MainMenu,footer,.stDeployButton{display:none !important;visibility:hidden !important}
 
   :root{color-scheme:light only}
-  /* Deeper base gradient so text pops harder */
-  .stApp{background:linear-gradient(110deg,#c9628a 0%,#3d84b8 100%);background-attachment:fixed}
+  /* Deep rich gradient */
+  .stApp{background:linear-gradient(110deg,#a33f6e 0%,#2d6ea3 100%);background-attachment:fixed}
   .block-container{padding-top:2rem;max-width:1080px;position:relative;z-index:3}
 
-  /* ═══ BACKGROUND ═════════════════════════════════════════════════ */
+  /* ═══ BACKGROUND (only soft particles, no color washes) ═════════ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
     z-index:1;transform:translateZ(0)}
 
-  /* Aurora — softer so it doesn't wash out content */
-  .aurora{position:absolute;inset:-20%;opacity:.65;
-    background:
-      radial-gradient(circle at 22% 22%, rgba(255,140,190,.55) 0%, rgba(255,140,190,.28) 22%, transparent 48%),
-      radial-gradient(circle at 78% 28%, rgba(140,170,255,.50) 0%, rgba(140,170,255,.25) 22%, transparent 48%),
-      radial-gradient(circle at 50% 78%, rgba(170,230,255,.42) 0%, rgba(170,230,255,.20) 22%, transparent 48%);
-    animation:auroraDrift 34s ease-in-out infinite;
-    will-change:transform;transform:translateZ(0)}
-  @keyframes auroraDrift{
-    0%,100%{transform:translate3d(0,0,0) scale(1)}
-    50%{transform:translate3d(-2%,1.5%,0) scale(1.06)}}
-
   .bokeh{position:absolute;width:var(--bs);height:var(--bs);border-radius:50%;
-    background:radial-gradient(circle,rgba(255,255,255,.85) 0%,rgba(255,210,230,.4) 35%,transparent 70%);
+    background:radial-gradient(circle,rgba(255,255,255,.75) 0%,rgba(255,210,230,.3) 35%,transparent 70%);
     opacity:0;pointer-events:none;transform:translateZ(0);
     animation:bokehFloat var(--bt) ease-in-out var(--bd) infinite alternate}
   @keyframes bokehFloat{
-    0%{opacity:.3;transform:translate3d(0,0,0) scale(1)}
-    100%{opacity:.7;transform:translate3d(15px,-25px,0) scale(1.2)}}
+    0%{opacity:.25;transform:translate3d(0,0,0) scale(1)}
+    100%{opacity:.55;transform:translate3d(15px,-25px,0) scale(1.2)}}
 
-  .cursor-glow{position:fixed;top:0;left:0;width:360px;height:360px;border-radius:50%;
-    pointer-events:none;
-    background:radial-gradient(circle,rgba(255,180,215,.28) 0%,rgba(150,180,255,.14) 45%,transparent 72%);
-    z-index:1;transform:translate3d(-9999px,-9999px,0);
-    transition:transform .4s cubic-bezier(.2,.8,.2,1);
-    will-change:transform}
-  @media (hover:none){.cursor-glow{display:none}}
-
-  /* ═══ PARTICLES ═════════════════════════════════════════════════ */
   .bubble{position:absolute;bottom:-50px;width:var(--s);height:var(--s);border-radius:50%;
     background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.35) 28%,rgba(180,220,255,.20) 55%,rgba(255,255,255,.05) 100%);
     border:1px solid rgba(255,255,255,.55);
@@ -222,128 +199,112 @@ st.markdown("""
   @keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
   @keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 
-  /* ═══ TITLE — very dark, thicker white halo ══════════════════════ */
+  /* ═══ TITLE — pure black with heavy white outline ═══════════════ */
   h1.love-title{
     font-family:'Great Vibes',cursive !important;text-align:center;font-size:5.5rem;
-    font-weight:600;color:#021108;margin:0;
-    -webkit-text-stroke:4.5px #ffffff;paint-order:stroke fill;
+    font-weight:600;color:#000000;margin:0;
+    -webkit-text-stroke:5px #ffffff;paint-order:stroke fill;
     text-shadow:
-      0 2px 0 rgba(255,255,255,1),
-      0 4px 18px rgba(0,0,0,.7),
-      0 0 24px rgba(255,255,255,1),
-      0 0 44px rgba(255,255,255,.75);
+      0 2px 0 #ffffff,
+      0 5px 20px rgba(0,0,0,.85),
+      0 0 28px rgba(255,255,255,1),
+      0 0 50px rgba(255,255,255,.8);
     animation:fadeInDown 1s cubic-bezier(.2,.8,.2,1) both}
 
-  /* ═══ SUBHEADING — near-solid white pill, dark wine text ═════════ */
+  /* ═══ SUBHEADING — solid white, pure black text ═════════════════ */
   p.love-sub{
     font-family:'Cormorant Garamond',serif !important;
     font-weight:800;font-style:italic;text-align:center;
-    font-size:1.18rem;letter-spacing:.35em;text-transform:uppercase;color:#2a0008;
-    margin:.9rem auto 0 auto;display:inline-block;padding:.5rem 1.5rem;
-    border:2.5px solid #7a0a1e;border-radius:999px;
-    background:rgba(255,255,255,.98);
-    box-shadow:
-      0 8px 24px rgba(0,0,0,.35),
-      0 0 14px rgba(255,214,232,1),
-      inset 0 1px 0 rgba(255,255,255,1);
-    -webkit-text-stroke:.4px #2a0008;
+    font-size:1.2rem;letter-spacing:.35em;text-transform:uppercase;color:#000000;
+    margin:.9rem auto 0 auto;display:inline-block;padding:.55rem 1.6rem;
+    border:3px solid #000000;border-radius:999px;
+    background:#ffffff;
+    box-shadow:0 10px 26px rgba(0,0,0,.5);
     animation:fadeInUp .9s .15s cubic-bezier(.2,.8,.2,1) both}
 
   /* ═══ TIMELINE ══════════════════════════════════════════════════ */
   .timeline{position:relative;max-width:920px;margin:10px auto 30px auto;padding:30px 0;
     contain:layout paint style}
-  .timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:4px;
+  .timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:5px;
     transform:translateX(-50%);border-radius:4px;
-    background:linear-gradient(180deg,transparent 0%,#04160C 8%,#c2185b 50%,#04160C 92%,transparent 100%)}
+    background:linear-gradient(180deg,transparent 0%,#000000 8%,#c2185b 50%,#000000 92%,transparent 100%)}
   .tl-item{position:relative;width:50%;padding:20px 60px;box-sizing:border-box;
     opacity:0;transform:translateY(28px);
     animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:var(--d)}
   .tl-item.left{left:0;text-align:right}.tl-item.right{left:50%;text-align:left}
-  .tl-heart{position:absolute;top:28px;width:34px;height:34px;z-index:3;
-    filter:drop-shadow(0 3px 8px rgba(0,0,0,.6));
+  .tl-heart{position:absolute;top:28px;width:36px;height:36px;z-index:3;
+    filter:drop-shadow(0 3px 10px rgba(0,0,0,.75));
     animation:beat 2.4s ease-in-out infinite}
   @keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
-  .tl-item.left .tl-heart{right:-17px}.tl-item.right .tl-heart{left:-17px}
+  .tl-item.left .tl-heart{right:-18px}.tl-item.right .tl-heart{left:-18px}
   .tl-heart svg{width:100%;height:100%}
 
-  /* ═══ TILES — near-solid white, thick dark border ═══════════════ */
+  /* ═══ TILES — 100% solid white, pure black border ═══════════════ */
   a.tl-card,a.tl-card:visited,a.tl-card:hover,a.tl-card:active{
     text-decoration:none;color:inherit}
   .tl-card{
     display:inline-block;padding:18px 26px;border-radius:18px;
     background:#ffffff;
-    border:2.5px solid #04160C;
-    box-shadow:
-      0 10px 30px rgba(0,0,0,.4),
-      0 0 0 1px rgba(255,255,255,.9) inset,
-      inset 0 2px 0 rgba(255,255,255,1);
+    border:3px solid #000000;
+    box-shadow:0 12px 32px rgba(0,0,0,.5);
     transition:transform .3s cubic-bezier(.2,.8,.2,1),
                box-shadow .3s ease,border-color .3s ease;
     text-align:inherit;position:relative;overflow:hidden;cursor:pointer;
     min-width:240px;min-height:96px;transform-style:preserve-3d}
-  .tl-card::before{content:'';position:absolute;inset:0;
-    background:radial-gradient(circle at 15% 20%,rgba(200,150,230,.12) 0%,transparent 60%);
-    pointer-events:none}
   .tl-card:hover{
     transform:translateY(-5px) scale(1.03);
     border-color:#7a0a1e;
-    box-shadow:
-      0 20px 44px rgba(0,0,0,.55),
-      0 0 0 1px rgba(255,255,255,1) inset}
+    box-shadow:0 22px 48px rgba(0,0,0,.65)}
   .tl-content{display:block;transition:opacity .25s ease}
   .tl-card:hover .tl-content{opacity:0}
   .tl-hover-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:1.55rem;color:#4a0312;
-    -webkit-text-stroke:.7px #4a0312;opacity:0;transform:scale(.94);
+    font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:1.6rem;color:#000000;
+    opacity:0;transform:scale(.94);
     transition:opacity .25s ease,transform .25s ease;
     pointer-events:none;text-align:center;padding:0 12px}
   .tl-card:hover .tl-hover-text{opacity:1;transform:scale(1)}
-  .tl-emoji{display:inline-block;font-size:1.25rem;margin-bottom:4px}
+  .tl-emoji{display:inline-block;font-size:1.3rem;margin-bottom:4px}
   .tl-title{font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:1.55rem;
-    color:#021108;line-height:1.25;margin:2px 0 8px 0;
-    -webkit-text-stroke:.7px #021108}
+    color:#000000;line-height:1.25;margin:2px 0 8px 0}
   .tl-date{display:inline-block;font-family:'Cormorant Garamond',serif;
-    font-style:italic;font-weight:700;font-size:.9rem;letter-spacing:.22em;
-    text-transform:uppercase;color:#2a0008;padding:4px 14px;
-    border-radius:999px;background:#ffd0e0;border:2px solid #4a0312}
+    font-style:italic;font-weight:700;font-size:.92rem;letter-spacing:.22em;
+    text-transform:uppercase;color:#000000;padding:5px 16px;
+    border-radius:999px;background:#ffd0e0;border:2.5px solid #000000}
 
-  /* ═══ CARDS — near-solid white, thick dark borders ══════════════ */
+  /* ═══ ALL CARDS — solid white, black borders ════════════════════ */
   .empty-state,.no-photo,.ending-card,.add-panel,.danger-box,.detail-about{
     background:#ffffff;
-    border:2.5px solid #04160C;
-    box-shadow:
-      0 14px 38px rgba(0,0,0,.4),
-      inset 0 1px 0 rgba(255,255,255,1)}
+    border:3px solid #000000;
+    box-shadow:0 16px 40px rgba(0,0,0,.5)}
 
   .empty-state{max-width:640px;margin:40px auto;padding:50px 40px;border-radius:24px;
     text-align:center;animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) both}
   .empty-emoji{font-size:3rem;display:block;margin-bottom:12px}
-  .empty-title{font-family:'Great Vibes',cursive;font-size:2.5rem;color:#021108;
-    margin:0 0 10px 0;text-shadow:0 1px 0 rgba(255,255,255,.9)}
-  .empty-text{font-family:'Lora',serif;font-style:italic;font-size:1.05rem;
-    color:#04160C;line-height:1.7}
-  .empty-hint{display:inline-block;margin-top:16px;font-family:'Inter',sans-serif;font-weight:700;
-    font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;color:#ffffff;
-    padding:9px 20px;border-radius:999px;
-    background:linear-gradient(135deg,#0d3b25 0%,#1c6b3f 55%,#2e9e63 100%);
-    border:2px solid #04160C;
-    box-shadow:0 6px 16px rgba(0,0,0,.4)}
+  .empty-title{font-family:'Great Vibes',cursive;font-size:2.5rem;color:#000000;margin:0 0 10px 0}
+  .empty-text{font-family:'Lora',serif;font-style:italic;font-size:1.08rem;
+    color:#000000;line-height:1.7}
+  .empty-hint{display:inline-block;margin-top:16px;font-family:'Inter',sans-serif;font-weight:800;
+    font-size:.85rem;letter-spacing:.14em;text-transform:uppercase;color:#ffffff;
+    padding:10px 22px;border-radius:999px;
+    background:linear-gradient(135deg,#000000 0%,#0d3b25 55%,#1c6b3f 100%);
+    border:2.5px solid #000000;
+    box-shadow:0 8px 20px rgba(0,0,0,.55)}
 
   .no-photo{max-width:820px;margin:24px auto 22px auto;padding:56px 30px;
     border-radius:20px;text-align:center;border-style:dashed}
   .no-photo-emoji{font-size:3rem;display:block;margin-bottom:10px}
-  .no-photo-text{font-family:'Lora',serif;font-style:italic;font-size:1.08rem;color:#04160C}
+  .no-photo-text{font-family:'Lora',serif;font-style:italic;font-size:1.1rem;color:#000000}
 
   /* ═══ ENDING CARD ═══════════════════════════════════════════════ */
   .ending-card{max-width:720px;margin:30px auto 20px auto;padding:34px 40px;border-radius:24px;
     text-align:center;position:relative;overflow:hidden;border-style:dashed;
     animation:fadeInUp 1s .6s cubic-bezier(.2,.8,.2,1) both}
-  .ending-heart{font-size:2.2rem;display:block;margin-bottom:8px;
+  .ending-heart{font-size:2.3rem;display:block;margin-bottom:8px;
     animation:beat 2.4s ease-in-out infinite}
-  .ending-title{font-family:'Great Vibes',cursive;font-size:2.7rem;color:#021108;
-    margin:4px 0 10px 0;text-shadow:0 2px 10px rgba(194,24,91,.35)}
-  .ending-text{font-family:'Lora',serif;font-style:italic;font-weight:500;font-size:1.08rem;
-    color:#04160C;line-height:1.75}
+  .ending-title{font-family:'Great Vibes',cursive;font-size:2.8rem;color:#000000;
+    margin:4px 0 10px 0}
+  .ending-text{font-family:'Lora',serif;font-style:italic;font-weight:500;font-size:1.1rem;
+    color:#000000;line-height:1.75}
   .ending-dots{margin-top:16px;letter-spacing:1em;font-size:1.5rem;color:#c2185b;
     animation:fadeInOut 2.6s ease-in-out infinite}
   @keyframes fadeInOut{0%,100%{opacity:.6}50%{opacity:1}}
@@ -351,140 +312,131 @@ st.markdown("""
   /* ═══ LOVE NOTE ═════════════════════════════════════════════════ */
   .love-note{max-width:720px;margin:10px auto 70px auto;padding:30px 20px;text-align:center;
     animation:fadeInUp 1.2s .9s cubic-bezier(.2,.8,.2,1) both}
-  .love-note-line{width:160px;height:2px;margin:0 auto;
-    background:linear-gradient(90deg,transparent,#04160C 40%,#04160C 60%,transparent);
-    border-radius:2px;opacity:.9}
-  .love-note-text{font-family:'Dancing Script',cursive;font-weight:700;font-size:4.4rem;color:#c2185b;
+  .love-note-line{width:170px;height:3px;margin:0 auto;
+    background:linear-gradient(90deg,transparent,#000000 40%,#000000 60%,transparent);
+    border-radius:2px}
+  .love-note-text{font-family:'Dancing Script',cursive;font-weight:700;font-size:4.5rem;color:#c2185b;
     margin:14px 0 8px 0;line-height:1.15;
     text-shadow:
-      0 0 14px rgba(255,92,138,.65),
-      0 3px 14px rgba(90,5,20,.7),
-      0 2px 0 rgba(255,255,255,1);
-    -webkit-text-stroke:1.6px #ffffff;paint-order:stroke fill;
+      0 0 16px rgba(255,92,138,.8),
+      0 4px 16px rgba(0,0,0,.8),
+      0 2px 0 #ffffff;
+    -webkit-text-stroke:1.8px #ffffff;paint-order:stroke fill;
     animation:lovePulse 3s ease-in-out infinite}
   @keyframes lovePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-  .love-note-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;
-    font-size:1.15rem;letter-spacing:.35em;text-transform:uppercase;color:#04160C;margin:0 0 18px 0;
-    -webkit-text-stroke:.3px #04160C}
+  .love-note-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:800;
+    font-size:1.2rem;letter-spacing:.35em;text-transform:uppercase;color:#000000;margin:0 0 18px 0;
+    text-shadow:0 1px 4px rgba(255,255,255,.9)}
 
   /* ═══ DETAIL PAGE ═══════════════════════════════════════════════ */
   .detail-wrap{max-width:880px;margin:10px auto 40px auto;
     animation:fadeInUp .8s cubic-bezier(.2,.8,.2,1) both}
   .detail-hero{text-align:center;margin:10px 0 18px 0}
-  .detail-emoji{font-size:3.4rem;display:block;margin-bottom:6px;
-    filter:drop-shadow(0 4px 12px rgba(0,0,0,.5))}
-  .detail-title{font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:2.7rem;
-    color:#021108;margin:6px 0 12px 0;
-    -webkit-text-stroke:.9px #021108;line-height:1.15;
-    text-shadow:0 2px 12px rgba(255,255,255,1)}
+  .detail-emoji{font-size:3.5rem;display:block;margin-bottom:6px;
+    filter:drop-shadow(0 4px 12px rgba(0,0,0,.7))}
+  .detail-title{font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:2.8rem;
+    color:#000000;margin:6px 0 12px 0;line-height:1.15;
+    text-shadow:0 2px 12px rgba(255,255,255,1), 0 1px 0 #ffffff}
   .detail-date{display:inline-block;font-family:'Cormorant Garamond',serif;
-    font-style:italic;font-weight:700;font-size:.98rem;letter-spacing:.28em;
-    text-transform:uppercase;color:#2a0008;padding:6px 20px;border-radius:999px;
-    background:#ffd0e0;border:2px solid #4a0312;
-    box-shadow:0 6px 16px rgba(0,0,0,.3)}
+    font-style:italic;font-weight:700;font-size:1rem;letter-spacing:.28em;
+    text-transform:uppercase;color:#000000;padding:7px 22px;border-radius:999px;
+    background:#ffd0e0;border:2.5px solid #000000;
+    box-shadow:0 6px 18px rgba(0,0,0,.4)}
 
   .gallery{display:grid;gap:14px;margin:24px auto 22px auto;max-width:820px;
     grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
   .gallery img{width:100%;height:220px;object-fit:cover;border-radius:18px;
-    border:3px solid #04160C;box-shadow:0 14px 32px rgba(0,0,0,.5);
+    border:4px solid #000000;box-shadow:0 14px 32px rgba(0,0,0,.6);
     transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s ease;cursor:pointer;
-    filter:contrast(1.05) saturate(1.05)}
-  .gallery img:hover{transform:translateY(-6px) scale(1.03);box-shadow:0 22px 48px rgba(0,0,0,.65)}
+    filter:contrast(1.08) saturate(1.08) brightness(1.02)}
+  .gallery img:hover{transform:translateY(-6px) scale(1.03);box-shadow:0 22px 48px rgba(0,0,0,.75)}
   .gallery img.single{grid-column:1/-1;height:auto;max-height:520px}
 
   .detail-about{max-width:820px;margin:0 auto;padding:28px 32px;border-radius:20px;
     font-family:'Lora',serif;font-style:italic;font-weight:500;
-    font-size:1.2rem;line-height:1.85;color:#04160C;position:relative;overflow:hidden}
+    font-size:1.22rem;line-height:1.85;color:#000000;position:relative;overflow:hidden}
   .detail-label{display:block;font-family:'Cormorant Garamond',serif;
-    font-style:italic;font-weight:700;font-size:.85rem;letter-spacing:.28em;
-    text-transform:uppercase;color:#4a0312;margin-bottom:8px;
-    -webkit-text-stroke:.3px #4a0312}
-  .detail-empty-story{opacity:.65;font-style:italic}
+    font-style:italic;font-weight:800;font-size:.88rem;letter-spacing:.28em;
+    text-transform:uppercase;color:#4a0312;margin-bottom:8px}
+  .detail-empty-story{opacity:.7;font-style:italic}
 
-  /* ═══ BUTTONS — darker green gradient, heavy white text ═════════ */
+  /* ═══ BUTTONS — very dark green, pure white text ════════════════ */
   .stButton>button{
-    background:linear-gradient(135deg,#052015 0%,#0f4a28 55%,#1c7a44 100%);
-    border:2.5px solid #021108;color:#ffffff;
-    font-family:'Inter',sans-serif;font-weight:700;letter-spacing:.04em;
+    background:linear-gradient(135deg,#000000 0%,#0a3320 55%,#155f34 100%);
+    border:3px solid #000000;color:#ffffff;
+    font-family:'Inter',sans-serif;font-weight:800;letter-spacing:.04em;
     border-radius:999px;white-space:nowrap;
-    text-shadow:0 2px 4px rgba(0,0,0,.65), 0 1px 2px rgba(0,0,0,.9);
+    text-shadow:0 2px 4px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,1);
     box-shadow:
-      0 10px 24px rgba(0,0,0,.55),
-      inset 0 1px 2px rgba(255,255,255,.35),
-      inset 0 -1px 2px rgba(0,0,0,.4);
+      0 12px 28px rgba(0,0,0,.65),
+      inset 0 1px 2px rgba(255,255,255,.3);
     transition:transform .25s cubic-bezier(.2,.8,.2,1),
                box-shadow .25s ease,background .25s ease}
   .stButton>button:hover{
-    background:linear-gradient(135deg,#0a3320 0%,#16592f 55%,#269253 100%);
-    border-color:#021108;
+    background:linear-gradient(135deg,#052015 0%,#0f4a28 55%,#1c7a44 100%);
+    border-color:#000000;
     transform:translateY(-2px) scale(1.03);
-    box-shadow:
-      0 16px 34px rgba(0,0,0,.7),
-      inset 0 1px 3px rgba(255,255,255,.55)}
+    box-shadow:0 18px 38px rgba(0,0,0,.8),
+               inset 0 1px 3px rgba(255,255,255,.5)}
   .stButton>button:active{transform:translateY(0) scale(.97)}
-  .stButton>button p{color:#ffffff !important;font-weight:700 !important}
-  .stButton>button[kind="secondary"]{padding:.42rem 1.1rem;font-size:.88rem}
+  .stButton>button p{color:#ffffff !important;font-weight:800 !important}
+  .stButton>button[kind="secondary"]{padding:.45rem 1.15rem;font-size:.9rem}
   .stButton>button[kind="primary"]{
-    background:linear-gradient(135deg,#3a020f 0%,#7a0a1e 45%,#c2185b 100%);
-    border-color:#2a0008;padding:.42rem 1.1rem;font-size:.88rem}
+    background:linear-gradient(135deg,#1a0008 0%,#5a0318 45%,#a10a4a 100%);
+    border-color:#000000;padding:.45rem 1.15rem;font-size:.9rem}
   .stButton>button[kind="primary"]:hover{
-    background:linear-gradient(135deg,#5a0318 0%,#a10a4a 45%,#e02a72 100%);
-    border-color:#3a020f}
+    background:linear-gradient(135deg,#3a020f 0%,#7a0a1e 45%,#c2185b 100%);
+    border-color:#000000}
 
-  /* ═══ FORM INPUTS — darker text, bolder borders ═════════════════ */
+  /* ═══ FORM INPUTS ═══════════════════════════════════════════════ */
   .stTextInput input,.stTextArea textarea,.stDateInput input{
-    background:#fff5f9 !important;color:#1a000a !important;
-    border-radius:14px !important;border:2.5px solid #7a0a1e !important;
+    background:#ffffff !important;color:#000000 !important;
+    border-radius:14px !important;border:3px solid #000000 !important;
     font-family:'Lora',serif !important;font-weight:700 !important;font-size:1.05rem !important;
-    box-shadow:inset 0 2px 6px rgba(194,24,91,.18), 0 2px 6px rgba(0,0,0,.12) !important;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.08) !important;
     transition:all .25s ease !important}
   .stTextInput input:focus,.stTextArea textarea:focus,.stDateInput input:focus{
-    border-color:#3a020f !important;background:#fff !important;
-    box-shadow:0 0 0 3px rgba(194,24,91,.4),inset 0 2px 6px rgba(194,24,91,.15) !important}
+    border-color:#c2185b !important;
+    box-shadow:0 0 0 3px rgba(194,24,91,.4),inset 0 2px 6px rgba(0,0,0,.08) !important}
   .stTextInput input::placeholder,.stTextArea textarea::placeholder{
-    color:#7a0a1e !important;font-style:italic !important;opacity:.9 !important}
+    color:#4a0312 !important;font-style:italic !important;opacity:.85 !important}
   .stTextInput label,.stTextArea label,.stDateInput label,.stSelectbox label,
   .stFileUploader label,.stMultiSelect label{
-    color:#021108 !important;font-family:'Cormorant Garamond',serif !important;
+    color:#000000 !important;font-family:'Cormorant Garamond',serif !important;
     font-style:italic !important;font-weight:800 !important;
-    letter-spacing:.15em !important;font-size:1.12rem !important;
-    -webkit-text-stroke:.3px #021108}
+    letter-spacing:.15em !important;font-size:1.15rem !important}
   .stSelectbox div[data-baseweb="select"]>div,
   .stMultiSelect div[data-baseweb="select"]>div{
-    background:#fff5f9 !important;border:2.5px solid #7a0a1e !important;
-    border-radius:14px !important;color:#1a000a !important;
-    font-family:'Lora',serif !important;font-weight:700 !important;
-    box-shadow:inset 0 2px 6px rgba(194,24,91,.18) !important}
-  .stFileUploader section{background:#fff5f9 !important;
-    border:2.5px dashed #7a0a1e !important;border-radius:16px !important;
-    box-shadow:inset 0 2px 8px rgba(194,24,91,.15) !important;
+    background:#ffffff !important;border:3px solid #000000 !important;
+    border-radius:14px !important;color:#000000 !important;
+    font-family:'Lora',serif !important;font-weight:700 !important}
+  .stFileUploader section{background:#ffffff !important;
+    border:3px dashed #000000 !important;border-radius:16px !important;
     transition:all .25s ease !important}
-  .stFileUploader section:hover{border-color:#3a020f !important;background:#fff !important}
-  section[data-testid="stFileUploadDropzone"]{color:#1a000a !important}
+  .stFileUploader section:hover{border-color:#c2185b !important}
+  section[data-testid="stFileUploadDropzone"]{color:#000000 !important}
   section[data-testid="stFileUploadDropzone"] button{
-    background:linear-gradient(135deg,#052015 0%,#0f4a28 55%,#1c7a44 100%) !important;
-    color:#ffffff !important;border:2.5px solid #021108 !important;
+    background:linear-gradient(135deg,#000000 0%,#0a3320 55%,#155f34 100%) !important;
+    color:#ffffff !important;border:2.5px solid #000000 !important;
     border-radius:999px !important;font-family:'Inter',sans-serif !important;
-    font-weight:700 !important;text-shadow:0 1px 2px rgba(0,0,0,.6) !important}
+    font-weight:800 !important}
 
   .add-panel{max-width:720px;margin:10px auto 30px auto;padding:28px 32px;border-radius:22px;
     animation:fadeInUp .7s cubic-bezier(.2,.8,.2,1) both}
   .add-title,.add-panel h2,h2.add-title,
   [data-testid="stMarkdownContainer"] h2.add-title,
   [data-testid="stMarkdownContainer"] .add-panel h2{
-    font-family:'Great Vibes',cursive !important;font-size:2.7rem !important;
+    font-family:'Great Vibes',cursive !important;font-size:2.8rem !important;
     font-weight:600 !important;text-align:center !important;margin:0 0 8px 0 !important;
-    color:#021108 !important;-webkit-text-fill-color:#021108 !important;
-    -webkit-text-stroke:0 !important;opacity:1 !important;
-    text-shadow:0 1px 0 rgba(255,255,255,.9)}
+    color:#000000 !important;-webkit-text-fill-color:#000000 !important;
+    -webkit-text-stroke:0 !important;opacity:1 !important}
 
   .danger-box{max-width:720px;margin:16px auto;padding:24px 28px;border-radius:18px;
-    text-align:center;border-style:dashed;background:#fff5f8;
+    text-align:center;border-style:dashed;background:#ffffff;
     animation:fadeInUp .5s ease-out both}
   .danger-title{font-family:'Lora',serif;font-style:italic;font-weight:800;
-    font-size:1.4rem;color:#4a0312;margin:0 0 8px 0;
-    -webkit-text-stroke:.3px #4a0312}
-  .danger-text{font-family:'Lora',serif;font-style:italic;color:#2a0008;font-size:1rem}
+    font-size:1.45rem;color:#4a0312;margin:0 0 8px 0}
+  .danger-text{font-family:'Lora',serif;font-style:italic;color:#000000;font-size:1.02rem}
 
   @keyframes confettiFloat{
     0%{opacity:1;transform:translate(-50%,-50%) scale(.8)}
@@ -494,22 +446,21 @@ st.markdown("""
     .timeline::before{left:22px}
     .tl-item{width:100%;left:0 !important;text-align:left !important;padding:18px 20px 18px 62px}
     .tl-item.left .tl-heart,.tl-item.right .tl-heart{left:5px;right:auto}
-    .detail-title{font-size:2.05rem}.detail-about{font-size:1.08rem;padding:22px 24px}
-    .tl-hover-text{font-size:1.3rem}.gallery{grid-template-columns:1fr}
-    h1.love-title{font-size:3.6rem;-webkit-text-stroke:3.5px #fff}
-    .love-note-text{font-size:2.9rem}.love-note-sub{font-size:.95rem;letter-spacing:.25em}
-    .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}}
+    .detail-title{font-size:2.1rem}.detail-about{font-size:1.1rem;padding:22px 24px}
+    .tl-hover-text{font-size:1.35rem}.gallery{grid-template-columns:1fr}
+    h1.love-title{font-size:3.6rem;-webkit-text-stroke:4px #fff}
+    .love-note-text{font-size:3rem}.love-note-sub{font-size:1rem;letter-spacing:.25em}
+    .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.2rem !important}}
 
   @media (prefers-reduced-motion: reduce){
-    .aurora,.bokeh,.bubble,.leaf,.dot,.cursor-glow,
-    .tl-heart,.ending-heart,.ending-dots,.love-note-text{animation:none !important}}
+    .bokeh,.bubble,.leaf,.dot,.tl-heart,.ending-heart,.ending-dots,.love-note-text{animation:none !important}}
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown(PARTICLES, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  JS
+#  JS — no cursor glow, no aurora
 # ═══════════════════════════════════════════════════════════════════════════
 components.html("""<script>
 (function(){
@@ -524,13 +475,6 @@ components.html("""<script>
         bg.style.transform = 'translate3d(0,' + (y * 0.3) + 'px,0)';
         r = false;
       });
-    }, { passive: true });
-  }
-  const glow = p.getElementById('cursor-glow');
-  if (glow) {
-    p.addEventListener('mousemove', e => {
-      glow.style.transform =
-        'translate3d(' + (e.clientX - 180) + 'px,' + (e.clientY - 180) + 'px,0)';
     }, { passive: true });
   }
   if (!matchMedia('(hover: none)').matches) {
@@ -603,23 +547,22 @@ components.html(f"""<style>
   .counter-wrap{{display:flex;justify-content:center;padding:20px 0 6px 0;
     animation:fadeInUp 1s .3s cubic-bezier(.2,.8,.2,1) both}}
   @keyframes fadeInUp{{from{{opacity:0;transform:translateY(24px)}}to{{opacity:1;transform:none}}}}
-  .days-counter{{display:inline-flex;align-items:center;gap:14px;padding:14px 28px;border-radius:999px;
-    background:#ffffff;border:2.5px solid #04160C;
-    box-shadow:0 12px 34px rgba(0,0,0,.4),inset 0 1px 1px rgba(255,255,255,1);
-    font-family:'Inter',sans-serif;color:#021108}}
-  .counter-label{{font-weight:800;font-size:.85rem;letter-spacing:.22em;
-    text-transform:uppercase;color:#021108;-webkit-text-stroke:.3px #021108}}
-  .counter-sep{{width:2px;height:28px;
-    background:linear-gradient(180deg,transparent,#04160C,transparent);opacity:.75}}
+  .days-counter{{display:inline-flex;align-items:center;gap:14px;padding:15px 30px;border-radius:999px;
+    background:#ffffff;border:3px solid #000000;
+    box-shadow:0 14px 36px rgba(0,0,0,.5);
+    font-family:'Inter',sans-serif;color:#000000}}
+  .counter-label{{font-weight:800;font-size:.88rem;letter-spacing:.22em;
+    text-transform:uppercase;color:#000000}}
+  .counter-sep{{width:2px;height:30px;
+    background:linear-gradient(180deg,transparent,#000000,transparent);opacity:.85}}
   .counter-unit{{display:inline-flex;align-items:baseline;gap:5px}}
-  .counter-unit b{{font-size:1.55rem;font-weight:800;color:#021108;line-height:1;
-    font-variant-numeric:tabular-nums;min-width:2.6ch;text-align:right;
-    -webkit-text-stroke:.4px #021108}}
-  .counter-unit span{{font-size:.75rem;font-weight:800;letter-spacing:.14em;
-    text-transform:uppercase;color:#021108;-webkit-text-stroke:.3px #021108}}
+  .counter-unit b{{font-size:1.6rem;font-weight:800;color:#000000;line-height:1;
+    font-variant-numeric:tabular-nums;min-width:2.6ch;text-align:right}}
+  .counter-unit span{{font-size:.78rem;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:#000000}}
   @media(max-width:680px){{.days-counter{{gap:10px;padding:12px 18px}}
-    .counter-unit b{{font-size:1.18rem}}.counter-unit span{{font-size:.68rem}}
-    .counter-label{{font-size:.72rem}}}}
+    .counter-unit b{{font-size:1.2rem}}.counter-unit span{{font-size:.7rem}}
+    .counter-label{{font-size:.75rem}}}}
 </style>
 <div class="counter-wrap"><div class="days-counter">
   <span class="counter-label">Together</span><span class="counter-sep"></span>
@@ -638,7 +581,7 @@ components.html(f"""<style>
   tick();setInterval(tick,1000);
 </script>""", height=110)
 
-st.markdown('<hr style="border:none;height:2.5px;width:90%;margin:1rem auto;background:linear-gradient(90deg,transparent,#04160C 15%,#04160C 85%,transparent);border-radius:2px;opacity:1">', unsafe_allow_html=True)
+st.markdown('<hr style="border:none;height:3px;width:90%;margin:1rem auto;background:linear-gradient(90deg,transparent,#000000 15%,#000000 85%,transparent);border-radius:2px">', unsafe_allow_html=True)
 
 # ── Routing ──────────────────────────────────────────────────────────────
 active = st.query_params.get("m")
@@ -777,7 +720,7 @@ else:
             f'<radialGradient id="hg{i}" cx="35%" cy="30%" r="75%">'
             f'<stop offset="0%" stop-color="#ffd0e0"/><stop offset="55%" stop-color="#c2185b"/>'
             f'<stop offset="100%" stop-color="#6b0f2e"/></radialGradient></defs>'
-            f'<path d="{HEART}" fill="url(#hg{i})" stroke="#fff" stroke-width="2"/></svg></div>'
+            f'<path d="{HEART}" fill="url(#hg{i})" stroke="#fff" stroke-width="2.5"/></svg></div>'
             f'<a class="tl-card" href="?m={k}"><div class="tl-content">'
             f'<span class="tl-emoji">{norm(m)["emoji"]}</span>'
             f'<div class="tl-title">{norm(m)["title"]}</div>'
