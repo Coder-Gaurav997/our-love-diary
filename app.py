@@ -122,7 +122,7 @@ def img_src(path): return path or ""
 def imgs_of(m): return [p for p in norm(m)["images"] if p]
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  PARTICLES
+#  PARTICLES + SOFT AURORA + PETALS
 # ═══════════════════════════════════════════════════════════════════════════
 rng = random.Random(42)
 def _p(cls, n):
@@ -140,10 +140,20 @@ def _bokeh(n=4):
         f'--bd:{rng.uniform(0,8):.1f}s;--bt:{rng.uniform(6,11):.1f}s"></span>'
         for _ in range(n))
 
+def _petals(n=10):
+    return "".join(
+        f'<span class="petal" style="left:{rng.uniform(0,100):.1f}%;'
+        f'--d:{rng.uniform(0,20):.1f}s;--t:{rng.uniform(12,22):.1f}s;'
+        f'--s:{rng.uniform(8,15):.1f}px;--x:{rng.uniform(-100,100):.0f}px;'
+        f'--r:{rng.uniform(-40,40):.0f}deg"></span>'
+        for _ in range(n))
+
 PARTICLES = (
     '<div class="living-bg" id="living-bg">'
+    '<div class="soft-glow"></div>'
     f'{_bokeh(4)}'
     f'{_p("bubble",8)}{_p("leaf",6)}{_p("dot",14)}'
+    f'{_petals(10)}'
     '</div>'
 )
 
@@ -165,6 +175,39 @@ st.markdown("""
   /* ═══ BACKGROUND — particles only ═══════════════════════════════ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
     z-index:1;transform:translateZ(0)}
+
+  /* ═══ SOFT AURORA GLOW (single, subtle) ═════════════════════════ */
+  .soft-glow{position:absolute;top:-25%;right:-15%;
+    width:65vmax;height:65vmax;border-radius:50%;
+    background:radial-gradient(circle,
+      rgba(255,170,215,.35) 0%,
+      rgba(180,200,255,.22) 45%,
+      transparent 72%);
+    filter:blur(30px);
+    opacity:.55;
+    animation:softDrift 32s ease-in-out infinite;
+    will-change:transform;transform:translateZ(0);pointer-events:none}
+  @keyframes softDrift{
+    0%,100%{transform:translate3d(0,0,0) scale(1)}
+    50%{transform:translate3d(-4%,3%,0) scale(1.08)}}
+
+  /* ═══ FALLING PINK PETALS ═══════════════════════════════════════ */
+  .petal{position:absolute;top:-40px;width:var(--s);height:calc(var(--s)*.7);
+    background:radial-gradient(circle at 40% 30%,
+      #ffe4f0 0%, #ffb8d4 45%, #f28bb5 100%);
+    border-radius:60% 5% 60% 5%;
+    box-shadow:inset -1px -1px 2px rgba(180,60,110,.25),
+               inset 1px 1px 2px rgba(255,255,255,.6),
+               0 2px 5px rgba(180,60,110,.18);
+    animation:petalFall var(--t) linear var(--d) infinite;
+    opacity:0;transform:translateZ(0)}
+  @keyframes petalFall{
+    0%{transform:translate3d(0,-10vh,0) rotate(0deg) rotateY(0);opacity:0}
+    8%{opacity:.85}
+    50%{transform:translate3d(calc(var(--x)*.5),50vh,0)
+        rotate(calc(180deg + var(--r))) rotateY(180deg);opacity:.75}
+    90%{opacity:.6}
+    100%{transform:translate3d(var(--x),115vh,0) rotate(540deg) rotateY(360deg);opacity:0}}
 
   .bokeh{position:absolute;width:var(--bs);height:var(--bs);border-radius:50%;
     background:radial-gradient(circle,rgba(255,255,255,.85) 0%,rgba(255,210,230,.4) 35%,transparent 70%);
