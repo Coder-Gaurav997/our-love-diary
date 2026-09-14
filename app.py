@@ -1,4 +1,4 @@
-"""🌿 Avrav Love Diary — Supabase edition (DB + Storage, no local files)."""
+"""🌿 Avrav Love Diary — Supabase edition (optimized)."""
 import pathlib, random, uuid
 from datetime import datetime
 import streamlit as st
@@ -7,16 +7,11 @@ from supabase import create_client, Client
 
 st.set_page_config(page_title="Our Love Diary", page_icon="❤️", layout="centered")
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  SUPABASE CONNECTION
-# ═══════════════════════════════════════════════════════════════════════════
 try:
     SB_URL = st.secrets["SUPABASE_URL"]
     SB_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
 except Exception:
-    st.error("🔑 Supabase credentials missing. Add `SUPABASE_URL` and "
-             "`SUPABASE_SERVICE_KEY` to `.streamlit/secrets.toml` (local) "
-             "or Streamlit Cloud → Settings → Secrets.")
+    st.error("🔑 Supabase credentials missing.")
     st.stop()
 
 BUCKET, TABLE = "moments-images", "moments"
@@ -27,19 +22,15 @@ def _sb() -> Client:
 
 supabase = _sb()
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  CONSTANTS
-# ═══════════════════════════════════════════════════════════════════════════
 START, PWD = "2026-05-01", "gaurav&avni"
 EMOJIS = ["💖","💌","🌙","☕","💗","✈️","💍","🌸","🎂","🎄","🌊","⭐","🎁","✨"]
-DEFAULTS = {"title": "Untitled Moment", "date": "—", "emoji": "💖",
-            "about": "", "images": []}
+DEFAULTS = {"title": "Untitled Moment", "date": "—", "emoji": "💖", "about": "", "images": []}
 
 for k in ("show_add", "unlocked", "edit", "del_mode"):
     st.session_state.setdefault(k, False)
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  DATA LAYER — all Supabase
+#  DATA LAYER
 # ═══════════════════════════════════════════════════════════════════════════
 def _load() -> dict:
     try:
@@ -61,64 +52,54 @@ def _load() -> dict:
         }
     return out
 
-def _key_for(title: str, existing: dict) -> str:
+def _key_for(title, existing):
     base = "".join(c if c.isalnum() else "_" for c in title.lower())[:40] or "moment"
     key, i = base, 1
     while key in existing:
         key, i = f"{base}_{i}", i + 1
     return key
 
-def _upload(f) -> str:
+def _upload(f):
     ext = (pathlib.Path(f.name).suffix.lower() or ".jpg")[:8]
     name = f"{uuid.uuid4().hex}{ext}"
     try:
         supabase.storage.from_(BUCKET).upload(
-            path=name,
-            file=bytes(f.getbuffer()),
-            file_options={"content-type": f.type or "image/jpeg", "upsert": "true"},
-        )
+            path=name, file=bytes(f.getbuffer()),
+            file_options={"content-type": f.type or "image/jpeg", "upsert": "true"})
         return supabase.storage.from_(BUCKET).get_public_url(name)
     except Exception as e:
-        st.error(f"Upload failed — {e}")
-        return ""
+        st.error(f"Upload failed — {e}"); return ""
 
-def _rm(url: str) -> None:
-    if not url or not url.startswith("http"):
-        return
+def _rm(url):
+    if not url or not url.startswith("http"): return
     try:
         name = url.split(f"/{BUCKET}/")[-1].split("?")[0]
         supabase.storage.from_(BUCKET).remove([name])
-    except Exception:
-        pass
+    except Exception: pass
 
 def add_moment(title, date, emoji, about, files):
-    existing = _load()
-    slug = _key_for(title, existing)
+    existing = _load(); slug = _key_for(title, existing)
     paths = [p for p in (_upload(f) for f in files) if p]
     try:
         supabase.table(TABLE).insert({
             "slug": slug, "title": title.strip(), "date": date.strip(),
-            "emoji": emoji, "about": about.strip(), "images": paths,
-        }).execute()
+            "emoji": emoji, "about": about.strip(), "images": paths}).execute()
     except Exception as e:
         st.error(f"Could not save — {e}")
 
 def update_moment(slug, title, date, emoji, about, keep, files):
     for old in (MOMENTS.get(slug, {}).get("images") or []):
-        if old not in keep:
-            _rm(old)
+        if old not in keep: _rm(old)
     new = [p for p in (_upload(f) for f in files) if p]
     try:
         supabase.table(TABLE).update({
             "title": title.strip(), "date": date.strip(), "emoji": emoji,
-            "about": about.strip(), "images": list(keep) + new,
-        }).eq("slug", slug).execute()
+            "about": about.strip(), "images": list(keep) + new}).eq("slug", slug).execute()
     except Exception as e:
         st.error(f"Could not update — {e}")
 
 def delete_moment(slug):
-    for img in (MOMENTS.get(slug, {}).get("images") or []):
-        _rm(img)
+    for img in (MOMENTS.get(slug, {}).get("images") or []): _rm(img)
     try:
         supabase.table(TABLE).delete().eq("slug", slug).execute()
     except Exception as e:
@@ -126,10 +107,7 @@ def delete_moment(slug):
 
 MOMENTS = _load()
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  HELPERS
-# ═══════════════════════════════════════════════════════════════════════════
-def norm(m: dict) -> dict:
+def norm(m):
     out = dict(DEFAULTS)
     out.update({k: v for k, v in (m or {}).items() if v is not None})
     if not isinstance(out.get("images"), list):
@@ -140,14 +118,11 @@ def norm(m: dict) -> dict:
     out["about"] = (out.get("about") or "").strip()
     return out
 
-def img_src(path: str) -> str:
-    return path or ""
-
-def imgs_of(m: dict) -> list:
-    return [p for p in norm(m)["images"] if p]
+def img_src(path): return path or ""
+def imgs_of(m): return [p for p in norm(m)["images"] if p]
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  PARTICLES — reduced counts for performance
+#  PARTICLES — minimal counts for max performance
 # ═══════════════════════════════════════════════════════════════════════════
 rng = random.Random(42)
 def _p(cls, n):
@@ -158,93 +133,74 @@ def _p(cls, n):
         f'--s:{rng.uniform(2 if cls == "dot" else 9, 5 if cls == "dot" else 28):.1f}px;'
         f'--x:{rng.uniform(-90,90):.0f}px"></span>' for _ in range(n))
 
-def _bokeh(n=6):
+def _bokeh(n=4):
     return "".join(
         f'<span class="bokeh" style="left:{rng.uniform(0,100):.1f}%;'
-        f'top:{rng.uniform(0,100):.1f}%;--bs:{rng.uniform(28,70):.0f}px;'
+        f'top:{rng.uniform(0,100):.1f}%;--bs:{rng.uniform(28,60):.0f}px;'
         f'--bd:{rng.uniform(0,8):.1f}s;--bt:{rng.uniform(6,11):.1f}s"></span>'
         for _ in range(n))
 
 PARTICLES = (
     '<div class="living-bg" id="living-bg">'
-    '<div class="aurora a1"></div>'
-    '<div class="aurora a2"></div>'
-    '<div class="aurora a3"></div>'
-    f'{_bokeh(6)}'
-    f'{_p("bubble",10)}{_p("leaf",8)}{_p("dot",20)}'
+    '<div class="aurora"></div>'
+    f'{_bokeh(4)}'
+    f'{_p("bubble",8)}{_p("leaf",6)}{_p("dot",14)}'
     '</div>'
     '<div class="cursor-glow" id="cursor-glow"></div>'
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  CSS — HIGH-CONTRAST + PERFORMANCE-TUNED
+#  CSS — PERFORMANCE-TUNED (no backdrop-filter, no aurora blur)
 # ═══════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@1,800&family=Lora:ital,wght@1,700&family=Inter:wght@500;600;700&family=Dancing+Script:wght@700&display=swap');
 
-  /* ── Hide Streamlit chrome ─────────────────────────────────────── */
-  header[data-testid="stHeader"],
-  [data-testid="manage-app-button"],
-  #MainMenu, footer, .stDeployButton {
-    display: none !important; visibility: hidden !important;
-  }
+  header[data-testid="stHeader"],[data-testid="manage-app-button"],
+  #MainMenu,footer,.stDeployButton{display:none !important;visibility:hidden !important}
 
   :root{color-scheme:light only}
-
-  .stApp{
-    background:linear-gradient(110deg,#e57b9a 0%,#5a9fd4 100%);
-    background-attachment:fixed}
+  .stApp{background:linear-gradient(110deg,#e57b9a 0%,#5a9fd4 100%);background-attachment:fixed}
   .block-container{padding-top:2rem;max-width:1080px;position:relative;z-index:3}
 
-  /* ═══ BACKGROUND LAYER (GPU-isolated) ═══════════════════════════ */
+  /* ═══ BACKGROUND LAYER (single paint layer, no blur) ═════════════ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
-    z-index:1;transition:transform .15s linear;
-    contain:strict;will-change:transform;transform:translateZ(0)}
+    z-index:1;transform:translateZ(0)}
 
-  /* Aurora — smaller, cheaper blur */
-  .aurora{position:absolute;width:48vmax;height:48vmax;border-radius:50%;
-    filter:blur(45px);opacity:.30;pointer-events:none;
-    will-change:transform;transform:translateZ(0);backface-visibility:hidden;
-    contain:strict}
-  .aurora.a1{top:-30%;left:-20%;
-    background:radial-gradient(circle,rgba(255,140,190,.75),transparent 65%);
-    animation:auroraFloat 28s ease-in-out infinite}
-  .aurora.a2{top:10%;right:-30%;
-    background:radial-gradient(circle,rgba(140,170,255,.7),transparent 65%);
-    animation:auroraFloat 34s ease-in-out -8s infinite}
-  .aurora.a3{bottom:-30%;left:20%;
-    background:radial-gradient(circle,rgba(170,230,255,.65),transparent 65%);
-    animation:auroraFloat 30s ease-in-out -16s infinite}
-  @keyframes auroraFloat{
+  /* Aurora — 3 gradients in ONE element, no filter blur (gradients are already soft) */
+  .aurora{position:absolute;inset:-20%;
+    background:
+      radial-gradient(circle at 22% 22%, rgba(255,140,190,.55) 0%, rgba(255,140,190,.28) 22%, transparent 48%),
+      radial-gradient(circle at 78% 28%, rgba(140,170,255,.50) 0%, rgba(140,170,255,.25) 22%, transparent 48%),
+      radial-gradient(circle at 50% 78%, rgba(170,230,255,.42) 0%, rgba(170,230,255,.20) 22%, transparent 48%);
+    animation:auroraDrift 34s ease-in-out infinite;
+    will-change:transform;transform:translateZ(0)}
+  @keyframes auroraDrift{
     0%,100%{transform:translate3d(0,0,0) scale(1)}
-    33%{transform:translate3d(8%,6%,0) scale(1.12)}
-    66%{transform:translate3d(-7%,-5%,0) scale(.95)}}
+    50%{transform:translate3d(-2%,1.5%,0) scale(1.06)}}
 
-  /* Bokeh — no blur filter (gradient is soft enough) */
   .bokeh{position:absolute;width:var(--bs);height:var(--bs);border-radius:50%;
     background:radial-gradient(circle,rgba(255,255,255,.85) 0%,rgba(255,210,230,.4) 35%,transparent 70%);
-    opacity:0;pointer-events:none;
-    will-change:opacity,transform;transform:translateZ(0);
+    opacity:0;pointer-events:none;transform:translateZ(0);
     animation:bokehFloat var(--bt) ease-in-out var(--bd) infinite alternate}
   @keyframes bokehFloat{
-    0%{opacity:.25;transform:translate3d(0,0,0) scale(1)}
-    100%{opacity:.65;transform:translate3d(20px,-30px,0) scale(1.25)}}
+    0%{opacity:.3;transform:translate3d(0,0,0) scale(1)}
+    100%{opacity:.7;transform:translate3d(15px,-25px,0) scale(1.2)}}
 
-  /* Cursor glow — no filter blur, smaller */
   .cursor-glow{position:fixed;top:0;left:0;width:360px;height:360px;border-radius:50%;
     pointer-events:none;
     background:radial-gradient(circle,rgba(255,180,215,.30) 0%,rgba(150,180,255,.15) 45%,transparent 72%);
-    z-index:1;will-change:transform;
-    transform:translate3d(-9999px,-9999px,0)}
+    z-index:1;transform:translate3d(-9999px,-9999px,0);
+    transition:transform .4s cubic-bezier(.2,.8,.2,1);
+    will-change:transform}
+  @media (hover:none){.cursor-glow{display:none}}
 
-  /* ═══ PARTICLE ANIMATIONS (GPU-hinted) ══════════════════════════ */
+  /* ═══ PARTICLES ═════════════════════════════════════════════════ */
   .bubble{position:absolute;bottom:-50px;width:var(--s);height:var(--s);border-radius:50%;
     background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.35) 28%,rgba(180,220,255,.20) 55%,rgba(255,255,255,.05) 100%);
     border:1px solid rgba(255,255,255,.55);
     box-shadow:inset -2px -3px 6px rgba(255,255,255,.55),inset 2px 2px 4px rgba(120,180,240,.35),0 0 10px rgba(255,255,255,.45);
-    animation:rise var(--t) linear var(--d) infinite;opacity:0;
-    will-change:transform,opacity;transform:translateZ(0)}
+    animation:rise var(--t) linear var(--d) infinite;opacity:0;transform:translateZ(0)}
   @keyframes rise{
     0%{transform:translate3d(0,0,0) scale(.5);opacity:0}10%{opacity:.95}
     50%{transform:translate3d(calc(var(--x)*.6),-50vh,0) scale(1);opacity:.85}90%{opacity:.55}
@@ -252,31 +208,18 @@ st.markdown("""
   .leaf{position:absolute;top:-50px;width:var(--s);height:calc(var(--s)*.6);
     background:linear-gradient(135deg,#a4e07a 0%,#4caf50 55%,#2e7d32 100%);border-radius:50% 0 50% 0;
     box-shadow:inset -1px -1px 3px rgba(0,0,0,.20),inset 1px 1px 2px rgba(255,255,255,.35),0 3px 6px rgba(0,0,0,.15);
-    animation:fall-leaf var(--t) linear var(--d) infinite;opacity:0;
-    will-change:transform,opacity;transform:translateZ(0)}
+    animation:fall-leaf var(--t) linear var(--d) infinite;opacity:0;transform:translateZ(0)}
   @keyframes fall-leaf{
     0%{transform:translate3d(0,-10vh,0) rotate(0) rotateY(0);opacity:0}8%{opacity:.9}
     50%{transform:translate3d(calc(var(--x)*.5),50vh,0) rotate(360deg) rotateY(180deg)}90%{opacity:.75}
     100%{transform:translate3d(var(--x),115vh,0) rotate(720deg) rotateY(360deg);opacity:0}}
   .dot{position:absolute;width:var(--s);height:var(--s);border-radius:50%;background:#fff;
     box-shadow:0 0 5px rgba(255,255,255,.95),0 0 12px rgba(255,246,200,.85),0 0 22px rgba(255,240,180,.55);
-    animation:twinkle var(--t) ease-in-out var(--d) infinite;opacity:0;
-    will-change:transform,opacity;transform:translateZ(0)}
+    animation:twinkle var(--t) ease-in-out var(--d) infinite;opacity:0;transform:translateZ(0)}
   @keyframes twinkle{0%,100%{opacity:0;transform:scale(.4)}50%{opacity:1;transform:scale(1.35)}}
 
   @keyframes fadeInDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
   @keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
-  @keyframes titleGlow{
-    0%,100%{text-shadow:
-      0 2px 0 rgba(255,255,255,.95),
-      0 4px 16px rgba(11,46,26,.6),
-      0 0 20px rgba(255,255,255,.95),
-      0 0 38px rgba(255,255,255,.6)}
-    50%{text-shadow:
-      0 2px 0 rgba(255,255,255,.95),
-      0 4px 20px rgba(11,46,26,.7),
-      0 0 28px rgba(255,220,240,1),
-      0 0 52px rgba(255,140,190,.75)}}
 
   /* ═══ TITLE ═════════════════════════════════════════════════════ */
   h1.love-title{
@@ -288,140 +231,102 @@ st.markdown("""
       0 4px 16px rgba(11,46,26,.6),
       0 0 20px rgba(255,255,255,.95),
       0 0 38px rgba(255,255,255,.6);
-    animation:fadeInDown 1s cubic-bezier(.2,.8,.2,1) both,
-              titleGlow 4s ease-in-out 1.2s infinite}
+    animation:fadeInDown 1s cubic-bezier(.2,.8,.2,1) both}
 
-  /* ═══ SUBHEADING ════════════════════════════════════════════════ */
   p.love-sub{
     font-family:'Cormorant Garamond',serif !important;
     font-weight:800;font-style:italic;text-align:center;
-    font-size:1.15rem;letter-spacing:.35em;text-transform:uppercase;
-    color:#04160C;
+    font-size:1.15rem;letter-spacing:.35em;text-transform:uppercase;color:#04160C;
     margin:.9rem auto 0 auto;display:inline-block;padding:.45rem 1.4rem;
-    border:2px solid #c2185b;
-    border-radius:999px;
-    background:rgba(255,255,255,.88);
-    backdrop-filter:blur(6px);
-    -webkit-backdrop-filter:blur(6px);
-    box-shadow:
-      0 8px 22px rgba(11,46,26,.25),
-      0 0 12px rgba(255,214,232,.9),
+    border:2px solid #c2185b;border-radius:999px;
+    background:rgba(255,255,255,.92);
+    box-shadow:0 8px 22px rgba(11,46,26,.25),0 0 12px rgba(255,214,232,.9),
       inset 0 1px 0 rgba(255,255,255,1);
     animation:fadeInUp .9s .15s cubic-bezier(.2,.8,.2,1) both}
 
   /* ═══ TIMELINE ══════════════════════════════════════════════════ */
-  .timeline{position:relative;max-width:920px;margin:10px auto 30px auto;padding:30px 0}
+  .timeline{position:relative;max-width:920px;margin:10px auto 30px auto;padding:30px 0;
+    contain:layout paint style}
   .timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:4px;
     transform:translateX(-50%);border-radius:4px;
-    background:linear-gradient(180deg,transparent 0%,#0B2E1A 8%,#c2185b 50%,#0B2E1A 92%,transparent 100%);
-    box-shadow:0 0 14px rgba(11,46,26,.55)}
+    background:linear-gradient(180deg,transparent 0%,#0B2E1A 8%,#c2185b 50%,#0B2E1A 92%,transparent 100%)}
   .tl-item{position:relative;width:50%;padding:20px 60px;box-sizing:border-box;
     opacity:0;transform:translateY(28px);
     animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:var(--d)}
   .tl-item.left{left:0;text-align:right}.tl-item.right{left:50%;text-align:left}
   .tl-heart{position:absolute;top:28px;width:34px;height:34px;z-index:3;
-    filter:drop-shadow(0 3px 10px rgba(11,46,26,.55));
+    filter:drop-shadow(0 3px 8px rgba(11,46,26,.5));
     animation:beat 2.4s ease-in-out infinite}
   @keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
   .tl-item.left .tl-heart{right:-17px}.tl-item.right .tl-heart{left:-17px}
   .tl-heart svg{width:100%;height:100%}
 
-  /* ═══ TILES ═════════════════════════════════════════════════════ */
+  /* ═══ TILES — solid rgba, no backdrop-filter ════════════════════ */
   a.tl-card,a.tl-card:visited,a.tl-card:hover,a.tl-card:active{
     text-decoration:none;color:inherit}
   .tl-card{
     display:inline-block;padding:18px 26px;border-radius:18px;
-    background:rgba(255,255,255,.82);
-    backdrop-filter:blur(6px) saturate(150%);
-    -webkit-backdrop-filter:blur(6px) saturate(150%);
+    background:rgba(255,255,255,.90);
     border:2px solid #0B2E1A;
-    box-shadow:
-      0 10px 30px rgba(11,46,26,.30),
-      inset 0 1px 0 rgba(255,255,255,.95);
-    transition:transform .35s cubic-bezier(.2,.8,.2,1),
-               box-shadow .35s ease,border-color .35s ease,background .35s ease;
+    box-shadow:0 10px 30px rgba(11,46,26,.30),inset 0 1px 0 rgba(255,255,255,.95);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1),
+               box-shadow .3s ease,border-color .3s ease,background .3s ease;
     text-align:inherit;position:relative;overflow:hidden;cursor:pointer;
-    min-width:240px;min-height:96px;
-    transform-style:preserve-3d;
-    will-change:transform;
-    contain:layout paint}
+    min-width:240px;min-height:96px;transform-style:preserve-3d}
   .tl-card::before{content:'';position:absolute;inset:0;
-    background:radial-gradient(circle at 15% 20%,rgba(200,150,230,.18) 0%,transparent 60%);
+    background:radial-gradient(circle at 15% 20%,rgba(200,150,230,.15) 0%,transparent 60%);
     pointer-events:none}
   .tl-card:hover{
     transform:translateY(-5px) scale(1.03);
-    background:rgba(255,255,255,.94);
+    background:rgba(255,255,255,.98);
     border-color:#c2185b;
-    box-shadow:0 18px 40px rgba(11,46,26,.45),
-               inset 0 1px 0 rgba(255,255,255,1)}
-  .tl-content{display:block;transition:opacity .3s ease}
+    box-shadow:0 18px 40px rgba(11,46,26,.45),inset 0 1px 0 rgba(255,255,255,1)}
+  .tl-content{display:block;transition:opacity .25s ease}
   .tl-card:hover .tl-content{opacity:0}
   .tl-hover-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:1.5rem;color:#7a0a1e;
-    letter-spacing:.02em;-webkit-text-stroke:.6px #7a0a1e;
-    opacity:0;transform:scale(.94);
-    transition:opacity .3s ease,transform .3s ease;
+    -webkit-text-stroke:.6px #7a0a1e;opacity:0;transform:scale(.94);
+    transition:opacity .25s ease,transform .25s ease;
     pointer-events:none;text-align:center;padding:0 12px}
   .tl-card:hover .tl-hover-text{opacity:1;transform:scale(1)}
   .tl-emoji{display:inline-block;font-size:1.2rem;margin-bottom:4px}
   .tl-title{font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:1.5rem;
-    color:#04160C;line-height:1.25;margin:2px 0 8px 0;
-    -webkit-text-stroke:.6px #04160C}
+    color:#04160C;line-height:1.25;margin:2px 0 8px 0;-webkit-text-stroke:.6px #04160C}
   .tl-date{display:inline-block;font-family:'Cormorant Garamond',serif;
     font-style:italic;font-weight:700;font-size:.88rem;letter-spacing:.22em;
     text-transform:uppercase;color:#3a020f;padding:4px 14px;
-    border-radius:999px;background:#ffd9e8;
-    border:1.5px solid #7a0a1e}
+    border-radius:999px;background:#ffd9e8;border:1.5px solid #7a0a1e}
 
   /* ═══ EMPTY / NO-PHOTO ══════════════════════════════════════════ */
+  .empty-state,.no-photo,.ending-card,.add-panel,.danger-box,.detail-about{
+    background:rgba(255,255,255,.92);
+    border:2px solid #0B2E1A;
+    box-shadow:0 12px 32px rgba(11,46,26,.28),inset 0 1px 0 rgba(255,255,255,.95)}
+
   .empty-state{max-width:640px;margin:40px auto;padding:50px 40px;border-radius:24px;
-    background:rgba(255,255,255,.85);
-    backdrop-filter:blur(6px) saturate(150%);
-    -webkit-backdrop-filter:blur(6px) saturate(150%);
-    border:2px dashed #0B2E1A;
-    box-shadow:0 14px 40px rgba(11,46,26,.28),
-               inset 0 1px 0 rgba(255,255,255,.95);
-    text-align:center;
-    animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) both}
+    text-align:center;animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) both}
   .empty-emoji{font-size:3rem;display:block;margin-bottom:12px;opacity:.85}
   .empty-title{font-family:'Great Vibes',cursive;font-size:2.4rem;color:#04160C;margin:0 0 10px 0}
-  .empty-text{font-family:'Lora',serif;font-style:italic;font-size:1.05rem;color:#04160C;
-    opacity:1;line-height:1.7}
+  .empty-text{font-family:'Lora',serif;font-style:italic;font-size:1.05rem;color:#04160C;line-height:1.7}
   .empty-hint{display:inline-block;margin-top:16px;font-family:'Inter',sans-serif;font-weight:600;
     font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;color:#7a0a1e;
     padding:8px 18px;border-radius:999px;background:#ffd9e8;border:1.5px solid #7a0a1e}
 
   .no-photo{max-width:820px;margin:24px auto 22px auto;padding:56px 30px;
-    border-radius:20px;text-align:center;
-    background:rgba(255,255,255,.85);
-    backdrop-filter:blur(6px) saturate(150%);
-    -webkit-backdrop-filter:blur(6px) saturate(150%);
-    border:2px dashed #0B2E1A;
-    box-shadow:0 12px 32px rgba(11,46,26,.28),
-               inset 0 1px 0 rgba(255,255,255,.95)}
+    border-radius:20px;text-align:center;border-style:dashed}
   .no-photo-emoji{font-size:3rem;display:block;margin-bottom:10px;opacity:.7}
   .no-photo-text{font-family:'Lora',serif;font-style:italic;font-size:1.05rem;color:#04160C;opacity:.85}
 
   /* ═══ ENDING CARD ═══════════════════════════════════════════════ */
   .ending-card{max-width:720px;margin:30px auto 20px auto;padding:34px 40px;border-radius:24px;
-    background:rgba(255,255,255,.85);
-    backdrop-filter:blur(6px) saturate(150%);
-    -webkit-backdrop-filter:blur(6px) saturate(150%);
-    border:2px dashed #0B2E1A;
-    box-shadow:0 14px 40px rgba(11,46,26,.30),
-               inset 0 1px 0 rgba(255,255,255,.95);
-    text-align:center;position:relative;overflow:hidden;
+    text-align:center;position:relative;overflow:hidden;border-style:dashed;
     animation:fadeInUp 1s .6s cubic-bezier(.2,.8,.2,1) both}
-  .ending-card::before{content:'';position:absolute;inset:0;
-    background:radial-gradient(circle at 50% 50%,rgba(200,150,230,.18) 0%,transparent 65%);
-    pointer-events:none;animation:pulseGlow 4s ease-in-out infinite}
-  @keyframes pulseGlow{0%,100%{opacity:.4}50%{opacity:1}}
-  .ending-heart{font-size:2.2rem;display:block;margin-bottom:8px;animation:beat 2.4s ease-in-out infinite;
-    filter:drop-shadow(0 0 12px rgba(255,92,138,.75))}
+  .ending-heart{font-size:2.2rem;display:block;margin-bottom:8px;
+    animation:beat 2.4s ease-in-out infinite}
   .ending-title{font-family:'Great Vibes',cursive;font-size:2.6rem;color:#04160C;margin:4px 0 10px 0;
     text-shadow:0 2px 10px rgba(194,24,91,.4)}
-  .ending-text{font-family:'Lora',serif;font-style:italic;font-weight:500;font-size:1.05rem;color:#04160C;
-    opacity:1;line-height:1.75;letter-spacing:.02em}
+  .ending-text{font-family:'Lora',serif;font-style:italic;font-weight:500;font-size:1.05rem;
+    color:#04160C;line-height:1.75;letter-spacing:.02em}
   .ending-dots{margin-top:16px;letter-spacing:1em;font-size:1.4rem;color:#c2185b;
     animation:fadeInOut 2.6s ease-in-out infinite}
   @keyframes fadeInOut{0%,100%{opacity:.5}50%{opacity:1}}
@@ -433,62 +338,41 @@ st.markdown("""
     background:linear-gradient(90deg,transparent,#0B2E1A 40%,#0B2E1A 60%,transparent);
     border-radius:2px;opacity:.75}
   .love-note-text{font-family:'Dancing Script',cursive;font-weight:700;font-size:4.2rem;color:#c2185b;
-    margin:14px 0 8px 0;line-height:1.15;letter-spacing:.01em;
-    text-shadow:
-      0 0 12px rgba(255,92,138,.55),
-      0 3px 12px rgba(122,10,30,.5),
-      0 2px 0 rgba(255,255,255,.85);
+    margin:14px 0 8px 0;line-height:1.15;
+    text-shadow:0 0 12px rgba(255,92,138,.55),0 3px 12px rgba(122,10,30,.5),0 2px 0 rgba(255,255,255,.85);
     -webkit-text-stroke:1.4px #fff;paint-order:stroke fill;
     animation:lovePulse 3s ease-in-out infinite}
   @keyframes lovePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
   .love-note-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;
-    font-size:1.1rem;letter-spacing:.35em;text-transform:uppercase;
-    color:#0B2E1A;opacity:1;margin:0 0 18px 0}
+    font-size:1.1rem;letter-spacing:.35em;text-transform:uppercase;color:#0B2E1A;margin:0 0 18px 0}
 
   /* ═══ DETAIL PAGE ═══════════════════════════════════════════════ */
   .detail-wrap{max-width:880px;margin:10px auto 40px auto;
     animation:fadeInUp .8s cubic-bezier(.2,.8,.2,1) both}
   .detail-hero{text-align:center;margin:10px 0 18px 0}
-  .detail-emoji{font-size:3.4rem;display:block;margin-bottom:6px;
-    filter:drop-shadow(0 4px 12px rgba(11,46,26,.45))}
+  .detail-emoji{font-size:3.4rem;display:block;margin-bottom:6px}
   .detail-title{font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:2.6rem;
-    color:#04160C;margin:6px 0 12px 0;
-    -webkit-text-stroke:.7px #04160C;line-height:1.15;
+    color:#04160C;margin:6px 0 12px 0;-webkit-text-stroke:.7px #04160C;line-height:1.15;
     text-shadow:0 2px 10px rgba(255,255,255,.85)}
   .detail-date{display:inline-block;font-family:'Cormorant Garamond',serif;
-    font-style:italic;font-weight:700;font-size:.95rem;
-    letter-spacing:.28em;text-transform:uppercase;color:#3a020f;
-    padding:5px 18px;border-radius:999px;background:#ffd9e8;
-    border:1.5px solid #7a0a1e;
-    box-shadow:0 6px 16px rgba(122,10,30,.25)}
+    font-style:italic;font-weight:700;font-size:.95rem;letter-spacing:.28em;
+    text-transform:uppercase;color:#3a020f;padding:5px 18px;border-radius:999px;
+    background:#ffd9e8;border:1.5px solid #7a0a1e}
 
   .gallery{display:grid;gap:14px;margin:24px auto 22px auto;max-width:820px;
     grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
   .gallery img{width:100%;height:220px;object-fit:cover;border-radius:18px;
-    border:3px solid #0B2E1A;
-    box-shadow:0 14px 32px rgba(11,46,26,.4);
-    transition:transform .4s cubic-bezier(.2,.8,.2,1),box-shadow .4s ease;cursor:pointer;
-    filter:contrast(1.05) saturate(1.05)}
+    border:3px solid #0B2E1A;box-shadow:0 14px 32px rgba(11,46,26,.4);
+    transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s ease;cursor:pointer}
   .gallery img:hover{transform:translateY(-6px) scale(1.03);box-shadow:0 22px 48px rgba(11,46,26,.55)}
   .gallery img.single{grid-column:1/-1;height:auto;max-height:520px}
 
   .detail-about{max-width:820px;margin:0 auto;padding:26px 30px;border-radius:20px;
-    background:rgba(255,255,255,.88);
-    backdrop-filter:blur(6px) saturate(150%);
-    -webkit-backdrop-filter:blur(6px) saturate(150%);
-    border:2px solid #0B2E1A;
-    box-shadow:0 12px 32px rgba(11,46,26,.28),
-               inset 0 1px 0 rgba(255,255,255,.95);
     font-family:'Lora',serif;font-style:italic;font-weight:500;
-    font-size:1.18rem;line-height:1.85;color:#04160C;
-    position:relative;overflow:hidden}
-  .detail-about::before{content:'';position:absolute;inset:0;
-    background:radial-gradient(circle at 10% 10%,rgba(200,150,230,.14) 0%,transparent 55%);
-    pointer-events:none}
+    font-size:1.18rem;line-height:1.85;color:#04160C;position:relative;overflow:hidden}
   .detail-label{display:block;font-family:'Cormorant Garamond',serif;
-    font-style:italic;font-weight:700;font-size:.82rem;
-    letter-spacing:.28em;text-transform:uppercase;
-    color:#7a0a1e;margin-bottom:8px}
+    font-style:italic;font-weight:700;font-size:.82rem;letter-spacing:.28em;
+    text-transform:uppercase;color:#7a0a1e;margin-bottom:8px}
   .detail-empty-story{opacity:.75;font-style:italic}
 
   /* ═══ BUTTONS ═══════════════════════════════════════════════════ */
@@ -496,17 +380,13 @@ st.markdown("""
     background:linear-gradient(135deg,#0d3b25 0%,#1c6b3f 55%,#2e9e63 100%);
     border:2px solid #062b18;color:#ffffff;
     font-family:'Inter',sans-serif;font-weight:600;letter-spacing:.04em;
-    border-radius:999px;
-    transition:all .3s cubic-bezier(.2,.8,.2,1);white-space:nowrap;
-    text-shadow:0 1px 2px rgba(0,0,0,.45);
-    box-shadow:0 8px 20px rgba(6,43,24,.5),
-               inset 0 1px 2px rgba(255,255,255,.3)}
+    border-radius:999px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.45);
+    box-shadow:0 8px 20px rgba(6,43,24,.5),inset 0 1px 2px rgba(255,255,255,.3);
+    transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s ease,background .25s ease}
   .stButton>button:hover{
     background:linear-gradient(135deg,#14532d 0%,#237a4a 55%,#3ab877 100%);
-    border-color:#1c6b3f;color:#ffffff;
-    transform:translateY(-2px) scale(1.03);
-    box-shadow:0 14px 30px rgba(6,43,24,.65),
-               inset 0 1px 3px rgba(255,255,255,.5)}
+    border-color:#1c6b3f;transform:translateY(-2px) scale(1.03);
+    box-shadow:0 14px 30px rgba(6,43,24,.65),inset 0 1px 3px rgba(255,255,255,.5)}
   .stButton>button:active{transform:translateY(0) scale(.97)}
   .stButton>button p{color:#ffffff !important;font-weight:600 !important}
   .stButton>button[kind="secondary"]{padding:.38rem 1rem;font-size:.85rem}
@@ -514,99 +394,61 @@ st.markdown("""
     background:linear-gradient(135deg,#5b0616 0%,#7a0a1e 45%,#c2185b 100%);
     border-color:#3a030e;padding:.38rem 1rem;font-size:.85rem}
   .stButton>button[kind="primary"]:hover{
-    background:linear-gradient(135deg,#7a0a1e 0%,#a10a4a 45%,#e02a72 100%);
-    border-color:#5b0616}
+    background:linear-gradient(135deg,#7a0a1e 0%,#a10a4a 45%,#e02a72 100%);border-color:#5b0616}
 
   /* ═══ FORM INPUTS ═══════════════════════════════════════════════ */
   .stTextInput input,.stTextArea textarea,.stDateInput input{
     background:#fff5f9 !important;color:#3a020f !important;
     border-radius:14px !important;border:2px solid #c2185b !important;
-    font-family:'Lora',serif !important;font-weight:600 !important;
-    font-size:1rem !important;
-    box-shadow:inset 0 2px 6px rgba(194,24,91,.12),
-               0 4px 10px rgba(194,24,91,.14) !important;
-    transition:all .3s cubic-bezier(.2,.8,.2,1) !important}
+    font-family:'Lora',serif !important;font-weight:600 !important;font-size:1rem !important;
+    box-shadow:inset 0 2px 6px rgba(194,24,91,.12) !important;
+    transition:all .25s ease !important}
   .stTextInput input:focus,.stTextArea textarea:focus,.stDateInput input:focus{
-    border-color:#7a0a1e !important;
-    box-shadow:0 0 0 3px rgba(194,24,91,.3),
-               inset 0 2px 6px rgba(194,24,91,.12) !important;
-    background:#fff !important}
+    border-color:#7a0a1e !important;background:#fff !important;
+    box-shadow:0 0 0 3px rgba(194,24,91,.3),inset 0 2px 6px rgba(194,24,91,.12) !important}
   .stTextInput input::placeholder,.stTextArea textarea::placeholder{
-    color:#8a4a60 !important;font-style:italic !important;opacity:1 !important}
-  .stTextInput label,.stTextArea label,.stDateInput label,
-  .stSelectbox label,.stFileUploader label,.stMultiSelect label{
-    color:#04160C !important;
-    font-family:'Cormorant Garamond',serif !important;
+    color:#8a4a60 !important;font-style:italic !important}
+  .stTextInput label,.stTextArea label,.stDateInput label,.stSelectbox label,
+  .stFileUploader label,.stMultiSelect label{
+    color:#04160C !important;font-family:'Cormorant Garamond',serif !important;
     font-style:italic !important;font-weight:700 !important;
     letter-spacing:.15em !important;font-size:1.08rem !important}
   .stSelectbox div[data-baseweb="select"]>div,
   .stMultiSelect div[data-baseweb="select"]>div{
     background:#fff5f9 !important;border:2px solid #c2185b !important;
     border-radius:14px !important;color:#3a020f !important;
-    font-family:'Lora',serif !important;font-weight:600 !important;
-    box-shadow:inset 0 2px 6px rgba(194,24,91,.12),
-               0 4px 10px rgba(194,24,91,.14) !important}
-  .stFileUploader section{
-    background:#fff5f9 !important;
+    font-family:'Lora',serif !important;font-weight:600 !important}
+  .stFileUploader section{background:#fff5f9 !important;
     border:2px dashed #c2185b !important;border-radius:16px !important;
-    box-shadow:inset 0 2px 8px rgba(194,24,91,.12) !important;
-    transition:all .3s ease !important}
-  .stFileUploader section:hover{
-    border-color:#7a0a1e !important;background:#fff !important}
+    transition:all .25s ease !important}
+  .stFileUploader section:hover{border-color:#7a0a1e !important;background:#fff !important}
   section[data-testid="stFileUploadDropzone"]{color:#3a020f !important}
   section[data-testid="stFileUploadDropzone"] button{
     background:linear-gradient(135deg,#0d3b25 0%,#1c6b3f 55%,#2e9e63 100%) !important;
     color:#ffffff !important;border:2px solid #062b18 !important;
-    border-radius:999px !important;
-    font-family:'Inter',sans-serif !important;font-weight:600 !important}
+    border-radius:999px !important;font-family:'Inter',sans-serif !important;font-weight:600 !important}
 
-  /* ═══ ADD/EDIT PANEL ════════════════════════════════════════════ */
   .add-panel{max-width:720px;margin:10px auto 30px auto;padding:26px 30px;border-radius:22px;
-    background:rgba(255,255,255,.88);
-    backdrop-filter:blur(6px) saturate(150%);
-    -webkit-backdrop-filter:blur(6px) saturate(150%);
-    border:2px solid #0B2E1A;
-    box-shadow:0 14px 36px rgba(11,46,26,.3),
-               inset 0 1px 0 rgba(255,255,255,.95);
     animation:fadeInUp .7s cubic-bezier(.2,.8,.2,1) both}
-
-  .add-title,
-  .add-panel h2,
-  .add-panel h2.add-title,
-  h2.add-title,
+  .add-title,.add-panel h2,h2.add-title,
   [data-testid="stMarkdownContainer"] h2.add-title,
   [data-testid="stMarkdownContainer"] .add-panel h2{
-    font-family:'Great Vibes',cursive !important;
-    font-size:2.6rem !important;
-    font-weight:600 !important;
-    text-align:center !important;
-    margin:0 0 6px 0 !important;
-    color:#04160C !important;
-    -webkit-text-fill-color:#04160C !important;
-    -webkit-text-stroke:0 !important;
-    opacity:1 !important;
-    filter:none !important;
-    mix-blend-mode:normal !important;
-    text-shadow:0 1px 0 rgba(255,255,255,.7);
-  }
+    font-family:'Great Vibes',cursive !important;font-size:2.6rem !important;
+    font-weight:600 !important;text-align:center !important;margin:0 0 6px 0 !important;
+    color:#04160C !important;-webkit-text-fill-color:#04160C !important;
+    -webkit-text-stroke:0 !important;opacity:1 !important;
+    text-shadow:0 1px 0 rgba(255,255,255,.7)}
 
   .danger-box{max-width:720px;margin:16px auto;padding:22px 26px;border-radius:18px;
-    background:rgba(255,240,246,.9);
-    backdrop-filter:blur(6px);
-    -webkit-backdrop-filter:blur(6px);
-    border:2px dashed #c2185b;
-    box-shadow:0 12px 32px rgba(194,24,91,.28),
-               inset 0 1px 0 rgba(255,255,255,.9);
-    text-align:center;animation:fadeInUp .5s ease-out both}
+    text-align:center;border-style:dashed;background:rgba(255,240,246,.94);
+    animation:fadeInUp .5s ease-out both}
   .danger-title{font-family:'Lora',serif;font-style:italic;font-weight:700;
     font-size:1.35rem;color:#7a0a1e;margin:0 0 6px 0}
   .danger-text{font-family:'Lora',serif;font-style:italic;color:#3a020f;font-size:.98rem}
 
-  /* ═══ CONFETTI ═════════════════════════════════════════════════ */
   @keyframes confettiFloat{
     0%{opacity:1;transform:translate(-50%,-50%) scale(.8)}
-    100%{opacity:0;
-      transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.4) rotate(15deg)}}
+    100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.4) rotate(15deg)}}
 
   /* ═══ MOBILE ════════════════════════════════════════════════════ */
   @media (max-width:680px){
@@ -620,20 +462,16 @@ st.markdown("""
     .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2rem !important}}
 
   /* ═══ REDUCED MOTION ════════════════════════════════════════════ */
-  @media (prefers-reduced-motion: reduce) {
-    .aurora, .bokeh, .bubble, .leaf, .dot,
-    .cursor-glow, .tl-heart, .ending-heart, .ending-dots {
-      animation: none !important;
-      transition: none !important;
-    }
-  }
+  @media (prefers-reduced-motion: reduce){
+    .aurora,.bokeh,.bubble,.leaf,.dot,.cursor-glow,
+    .tl-heart,.ending-heart,.ending-dots,.love-note-text{animation:none !important}}
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown(PARTICLES, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  OPTIMIZED JS — rAF-throttled, cached rects, passive listeners
+#  OPTIMIZED JS — CSS transition for cursor glow, cached rects, passive
 # ═══════════════════════════════════════════════════════════════════════════
 components.html("""<script>
 (function(){
@@ -644,85 +482,62 @@ components.html("""<script>
   if (bg) {
     let r = false;
     p.addEventListener('scroll', () => {
-      if (r) return;
-      r = true;
+      if (r) return; r = true;
       requestAnimationFrame(() => {
         const y = p.documentElement.scrollTop || p.body.scrollTop || 0;
-        bg.style.transform = 'translate3d(0,' + (y * 0.35) + 'px,0)';
+        bg.style.transform = 'translate3d(0,' + (y * 0.3) + 'px,0)';
         r = false;
       });
     }, { passive: true });
   }
 
-  /* ── Cursor glow (rAF + idle skip) ── */
+  /* ── Cursor glow — CSS transition (no rAF loop) ── */
   const glow = p.getElementById('cursor-glow');
   if (glow) {
-    let gx = 0, gy = 0, tx = 0, ty = 0, active = false;
     p.addEventListener('mousemove', e => {
-      tx = e.clientX; ty = e.clientY; active = true;
+      glow.style.transform =
+        'translate3d(' + (e.clientX - 180) + 'px,' + (e.clientY - 180) + 'px,0)';
     }, { passive: true });
-    (function anim(){
-      if (active) {
-        gx += (tx - gx) * 0.14;
-        gy += (ty - gy) * 0.14;
-        if (Math.abs(tx - gx) < 0.5 && Math.abs(ty - gy) < 0.5) {
-          gx = tx; gy = ty; active = false;
-        }
-        glow.style.transform =
-          'translate3d(' + (gx - 180) + 'px,' + (gy - 180) + 'px,0)';
-      }
-      requestAnimationFrame(anim);
-    })();
   }
 
-  /* ── 3D tilt (cached rect, rAF-throttled, desktop only) ── */
-  const isTouch = matchMedia('(hover: none)').matches;
-  if (!isTouch) {
-    let tiltCard = null, tiltRect = null;
-    let lastX = 0, lastY = 0, tiltRaf = false;
+  /* ── 3D tilt (rAF-throttled, desktop only, cached rect) ── */
+  if (!matchMedia('(hover: none)').matches) {
+    let card = null, rect = null, mx = 0, my = 0, busy = false;
 
     p.addEventListener('mouseover', e => {
       const c = e.target.closest && e.target.closest('.tl-card');
-      if (c && c !== tiltCard) {
-        tiltCard = c;
-        tiltRect = c.getBoundingClientRect();
-      }
+      if (c && c !== card) { card = c; rect = c.getBoundingClientRect(); }
     }, { passive: true });
 
     p.addEventListener('mouseout', e => {
       const c = e.target.closest && e.target.closest('.tl-card');
-      if (c && c === tiltCard) {
-        c.style.transform = '';
-        tiltCard = null; tiltRect = null;
-      }
+      if (c && c === card) { c.style.transform = ''; card = null; rect = null; }
     }, { passive: true });
 
     p.addEventListener('mousemove', e => {
-      if (!tiltCard) return;
-      lastX = e.clientX; lastY = e.clientY;
-      if (tiltRaf) return;
-      tiltRaf = true;
+      if (!card) return;
+      mx = e.clientX; my = e.clientY;
+      if (busy) return; busy = true;
       requestAnimationFrame(() => {
-        tiltRaf = false;
-        if (!tiltCard || !tiltRect) return;
-        const x = (lastX - tiltRect.left) / tiltRect.width - 0.5;
-        const y = (lastY - tiltRect.top) / tiltRect.height - 0.5;
-        tiltCard.style.transform =
+        busy = false;
+        if (!card || !rect) return;
+        const x = (mx - rect.left) / rect.width - 0.5;
+        const y = (my - rect.top) / rect.height - 0.5;
+        card.style.transform =
           'perspective(700px) rotateY(' + (x * 6) + 'deg) rotateX(' + (-y * 6) +
           'deg) translateY(-5px) scale(1.02)';
       });
     }, { passive: true });
   }
 
-  /* ── Confetti (throttled to 1 burst / 120ms) ── */
+  /* ── Confetti (throttled) ── */
   let lastBurst = 0;
   p.addEventListener('click', e => {
     const t = e.target;
-    if (t.closest('button, input, textarea, select, [data-testid="stFileUploaderDropzone"]')) return;
+    if (t.closest('button,input,textarea,select,[data-testid="stFileUploaderDropzone"]')) return;
     const now = Date.now();
-    if (now - lastBurst < 120) return;
+    if (now - lastBurst < 150) return;
     lastBurst = now;
-
     const glyphs = ['❤️','💖','💕','💗','💘','🌸'];
     for (let i = 0; i < 3; i++) {
       const h = p.createElement('span');
@@ -763,25 +578,18 @@ components.html(f"""<style>
     animation:fadeInUp 1s .3s cubic-bezier(.2,.8,.2,1) both}}
   @keyframes fadeInUp{{from{{opacity:0;transform:translateY(24px)}}to{{opacity:1;transform:none}}}}
   .days-counter{{display:inline-flex;align-items:center;gap:14px;padding:14px 28px;border-radius:999px;
-    background:rgba(255,255,255,.92);
-    backdrop-filter:blur(6px) saturate(1.4);
-    -webkit-backdrop-filter:blur(6px) saturate(1.4);
-    border:2px solid #0B2E1A;
-    box-shadow:0 12px 34px rgba(11,46,26,.28),
-      inset 0 1px 1px rgba(255,255,255,1),
-      inset 0 -1px 2px rgba(11,46,26,.08);
-    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-    font-style:normal;letter-spacing:.02em;color:#04160C}}
-  .counter-label{{font-weight:700;font-size:.82rem;letter-spacing:.22em;text-transform:uppercase;
-    color:#04160C;opacity:1}}
+    background:rgba(255,255,255,.95);border:2px solid #0B2E1A;
+    box-shadow:0 12px 34px rgba(11,46,26,.28),inset 0 1px 1px rgba(255,255,255,1);
+    font-family:'Inter',sans-serif;color:#04160C}}
+  .counter-label{{font-weight:700;font-size:.82rem;letter-spacing:.22em;
+    text-transform:uppercase;color:#04160C}}
   .counter-sep{{width:1.5px;height:26px;
     background:linear-gradient(180deg,transparent,rgba(11,46,26,.55),transparent)}}
   .counter-unit{{display:inline-flex;align-items:baseline;gap:5px}}
   .counter-unit b{{font-size:1.5rem;font-weight:700;color:#04160C;line-height:1;
-    font-variant-numeric:tabular-nums;text-shadow:0 1px 0 rgba(255,255,255,.8);
-    min-width:2.6ch;text-align:right}}
-  .counter-unit span{{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-    color:#04160C;opacity:.85}}
+    font-variant-numeric:tabular-nums;min-width:2.6ch;text-align:right}}
+  .counter-unit span{{font-size:.72rem;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:#04160C;opacity:.85}}
   @media(max-width:680px){{.days-counter{{gap:10px;padding:12px 18px}}
     .counter-unit b{{font-size:1.15rem}}.counter-unit span{{font-size:.65rem}}
     .counter-label{{font-size:.72rem}}}}
@@ -831,8 +639,7 @@ if st.session_state.show_add:
             files = st.file_uploader("Photos (optional)", accept_multiple_files=True,
                                      type=["png","jpg","jpeg","webp","gif"])
             if st.form_submit_button("Save Moment 💾"):
-                if not title.strip():
-                    st.warning("Please enter a title.")
+                if not title.strip(): st.warning("Please enter a title.")
                 else:
                     add_moment(title, dv.strftime("%d %b %Y"), emoji, about, files or [])
                     st.success(f"Saved “{title}” 💖")
@@ -914,10 +721,8 @@ elif active and active in MOMENTS:
     elif len(imgs) > 1:
         gal = '<div class="gallery">' + "".join(f'<img src="{p}"/>' for p in imgs) + '</div>'
     else:
-        gal = ('<div class="no-photo">'
-               '<span class="no-photo-emoji">📷</span>'
-               '<div class="no-photo-text">No photos for this moment yet.</div>'
-               '</div>')
+        gal = ('<div class="no-photo"><span class="no-photo-emoji">📷</span>'
+               '<div class="no-photo-text">No photos for this moment yet.</div></div>')
 
     story = m["about"] or '<span class="detail-empty-story">No story written yet.</span>'
 
@@ -932,17 +737,12 @@ elif active and active in MOMENTS:
 # ═══ 3) TIMELINE ═════════════════════════════════════════════════════════
 else:
     if not MOMENTS:
-        st.markdown("""
-        <div class="empty-state">
+        st.markdown("""<div class="empty-state">
           <span class="empty-emoji">🌱</span>
           <div class="empty-title">Our story is just beginning…</div>
-          <div class="empty-text">
-            No moments yet. Click <b>✚ Add Moment</b> in the top-right corner
-            to write the very first page of our diary.
-          </div>
-          <div class="empty-hint">✚ Add Moment</div>
-        </div>
-        """, unsafe_allow_html=True)
+          <div class="empty-text">No moments yet. Click <b>✚ Add Moment</b> in the top-right corner
+            to write the very first page of our diary.</div>
+          <div class="empty-hint">✚ Add Moment</div></div>""", unsafe_allow_html=True)
     else:
         items = "".join(
             f'<div class="tl-item {"left" if i%2==0 else "right"}" style="--d:{i*.12:.2f}s">'
