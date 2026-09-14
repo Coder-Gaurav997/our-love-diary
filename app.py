@@ -1,4 +1,4 @@
-"""🌿 Avrav Love Diary — Supabase edition (optimized)."""
+"""🌿 Avrav Love Diary — Supabase edition (with PWA, offline, share, public)."""
 import pathlib, random, uuid
 from datetime import datetime
 import streamlit as st
@@ -6,6 +6,11 @@ import streamlit.components.v1 as components
 from supabase import create_client, Client
 
 st.set_page_config(page_title="Our Love Diary", page_icon="❤️", layout="centered")
+
+# ── URL MODES ──────────────────────────────────────────────────────────────
+_share  = st.query_params.get("share") == "1"
+_public = st.query_params.get("public") == "1"
+_readonly = _share or _public
 
 try:
     SB_URL = st.secrets["SUPABASE_URL"]
@@ -27,6 +32,7 @@ DEFAULTS = {"title": "Untitled Moment", "date": "—", "emoji": "💖", "about":
 
 for k in ("show_add", "unlocked", "edit", "del_mode"):
     st.session_state.setdefault(k, False)
+st.session_state.setdefault("pending_writes", [])
 
 # ── DATA LAYER ─────────────────────────────────────────────────────────────
 def _load() -> dict:
@@ -78,7 +84,9 @@ def add_moment(title, date, emoji, about, files):
             "slug": _key_for(title, existing), "title": title.strip(),
             "date": date.strip(), "emoji": emoji, "about": about.strip(),
             "images": paths}).execute()
-    except Exception as e: st.error(f"Could not save — {e}")
+        return True
+    except Exception as e:
+        st.error(f"Could not save — {e}"); return False
 
 def update_moment(slug, title, date, emoji, about, keep, files):
     for old in (MOMENTS.get(slug, {}).get("images") or []):
@@ -94,8 +102,6 @@ def delete_moment(slug):
     for img in (MOMENTS.get(slug, {}).get("images") or []): _rm(img)
     try: supabase.table(TABLE).delete().eq("slug", slug).execute()
     except Exception as e: st.error(f"Could not delete — {e}")
-
-MOMENTS = _load()
 
 def norm(m):
     out = dict(DEFAULTS)
@@ -139,6 +145,15 @@ PARTICLES = (
     '</div>'
 )
 
+# ── SKELETON LOADER placeholder (rendered now, removed after data loads) ──
+LOADER_HTML = (
+    '<div class="avrav-loader" id="avrav-loader">'
+    '<div class="ld-heart">💗</div>'
+    '<div class="ld-text">Loading our story…</div>'
+    '<div class="ld-bar"><div class="ld-bar-fill"></div></div>'
+    '</div>'
+)
+
 # ── CSS ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -150,13 +165,54 @@ st.markdown("""
   .stApp{background:linear-gradient(110deg,#e07ba0 0%,#6fa8d4 100%);background-attachment:fixed}
   .block-container{padding-top:2rem;max-width:1080px;position:relative;z-index:3}
 
-  /* ═══ BG ═══ */
+  /* ═══ SKELETON LOADER ═══ */
+  .avrav-loader{position:fixed;inset:0;z-index:99999;
+    background:linear-gradient(110deg,#e07ba0 0%,#6fa8d4 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    transition:opacity .5s ease}
+  .avrav-loader.hidden{opacity:0;pointer-events:none}
+  .ld-heart{font-size:4rem;animation:ldbeat 1.2s ease-in-out infinite;
+    filter:drop-shadow(0 6px 20px rgba(0,0,0,.3))}
+  @keyframes ldbeat{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
+  .ld-text{font-family:'Dancing Script',cursive;font-weight:700;font-size:1.8rem;
+    color:#fff;margin-top:14px;text-shadow:0 2px 12px rgba(0,0,0,.4)}
+  .ld-bar{width:220px;height:4px;margin-top:22px;border-radius:999px;
+    background:rgba(255,255,255,.25);overflow:hidden}
+  .ld-bar-fill{height:100%;width:40%;border-radius:999px;background:#fff;
+    animation:ldslide 1.4s ease-in-out infinite}
+  @keyframes ldslide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+
+  /* ═══ OFFLINE BANNER ═══ */
+  .offline-banner{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(120px);
+    background:linear-gradient(135deg,#3a020f 0%,#7a0a1e 100%);
+    color:#fff;padding:12px 24px;border-radius:999px;
+    font-family:'Inter',sans-serif;font-weight:700;font-size:.9rem;
+    box-shadow:0 12px 34px rgba(0,0,0,.55);
+    z-index:99998;display:flex;align-items:center;gap:10px;
+    transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+  .offline-banner.show{transform:translateX(-50%) translateY(0)}
+  .offline-dot{width:10px;height:10px;border-radius:50%;background:#ff4d6d;
+    box-shadow:0 0 12px #ff4d6d;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* ═══ PUBLIC/SHARE PILL ═══ */
+  .mode-pill{display:inline-flex;align-items:center;gap:8px;
+    padding:8px 18px;border-radius:999px;
+    background:rgba(255,255,255,.94);border:2px solid #0B2E1A;
+    font-family:'Inter',sans-serif;font-weight:700;font-size:.82rem;
+    letter-spacing:.1em;text-transform:uppercase;color:#04160C;
+    box-shadow:0 6px 18px rgba(11,46,26,.28);
+    margin:0 auto 12px auto}
+  .mode-pill .dot{width:8px;height:8px;border-radius:50%;background:#2e9e63;
+    box-shadow:0 0 8px rgba(46,158,99,.8)}
+  .mode-pill.share .dot{background:#c2185b;box-shadow:0 0 8px rgba(194,24,91,.8)}
+
+  /* ═══ BACKGROUND ═══ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
     z-index:1;transform:translateZ(0);contain:strict}
   .soft-glow{position:absolute;top:-25%;right:-15%;width:65vmax;height:65vmax;border-radius:50%;
-    background:radial-gradient(circle,
-      rgba(255,170,215,.45) 0%, rgba(255,170,215,.25) 20%,
-      rgba(180,200,255,.15) 45%, transparent 72%);
+    background:radial-gradient(circle,rgba(255,170,215,.45) 0%,rgba(255,170,215,.25) 20%,
+      rgba(180,200,255,.15) 45%,transparent 72%);
     opacity:.55;animation:softDrift 32s ease-in-out infinite;
     will-change:transform;transform:translateZ(0);pointer-events:none}
   @keyframes softDrift{0%,100%{transform:translate3d(0,0,0) scale(1)}
@@ -168,16 +224,19 @@ st.markdown("""
   @keyframes bokehFloat{0%{opacity:.3;transform:translate3d(0,0,0) scale(1)}
     100%{opacity:.7;transform:translate3d(15px,-25px,0) scale(1.2)}}
   .bubble{position:absolute;bottom:-50px;width:var(--s);height:var(--s);border-radius:50%;
-    background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.35) 28%,rgba(180,220,255,.20) 55%,rgba(255,255,255,.05) 100%);
+    background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.35) 28%,
+      rgba(180,220,255,.20) 55%,rgba(255,255,255,.05) 100%);
     border:1px solid rgba(255,255,255,.55);
-    box-shadow:inset -2px -3px 6px rgba(255,255,255,.55),inset 2px 2px 4px rgba(120,180,240,.35),0 0 10px rgba(255,255,255,.45);
+    box-shadow:inset -2px -3px 6px rgba(255,255,255,.55),inset 2px 2px 4px rgba(120,180,240,.35),
+      0 0 10px rgba(255,255,255,.45);
     animation:rise var(--t) linear var(--d) infinite;opacity:0;transform:translateZ(0)}
   @keyframes rise{0%{transform:translate3d(0,0,0) scale(.5);opacity:0}10%{opacity:.95}
     50%{transform:translate3d(calc(var(--x)*.6),-50vh,0) scale(1);opacity:.85}90%{opacity:.55}
     100%{transform:translate3d(var(--x),-110vh,0) scale(1.15);opacity:0}}
   .leaf{position:absolute;top:-50px;width:var(--s);height:calc(var(--s)*.6);
     background:linear-gradient(135deg,#a4e07a 0%,#4caf50 55%,#2e7d32 100%);border-radius:50% 0 50% 0;
-    box-shadow:inset -1px -1px 3px rgba(0,0,0,.2),inset 1px 1px 2px rgba(255,255,255,.35),0 3px 6px rgba(0,0,0,.15);
+    box-shadow:inset -1px -1px 3px rgba(0,0,0,.2),inset 1px 1px 2px rgba(255,255,255,.35),
+      0 3px 6px rgba(0,0,0,.15);
     animation:fall-leaf var(--t) linear var(--d) infinite;opacity:0;transform:translateZ(0)}
   @keyframes fall-leaf{0%{transform:translate3d(0,-10vh,0) rotate(0) rotateY(0);opacity:0}8%{opacity:.9}
     50%{transform:translate3d(calc(var(--x)*.5),50vh,0) rotate(360deg) rotateY(180deg)}90%{opacity:.75}
@@ -185,7 +244,8 @@ st.markdown("""
   .petal{position:absolute;top:-40px;width:var(--s);height:calc(var(--s)*.7);
     background:radial-gradient(circle at 40% 30%,#ffd0e5 0%,#ff9ec2 45%,#e56a9a 100%);
     border-radius:60% 5% 60% 5%;
-    box-shadow:inset -1px -1px 2px rgba(180,60,110,.25),inset 1px 1px 2px rgba(255,255,255,.6),0 2px 5px rgba(180,60,110,.18);
+    box-shadow:inset -1px -1px 2px rgba(180,60,110,.25),inset 1px 1px 2px rgba(255,255,255,.6),
+      0 2px 5px rgba(180,60,110,.18);
     animation:petalFall var(--t) linear var(--d) infinite;opacity:0;transform:translateZ(0)}
   @keyframes petalFall{0%{transform:translate3d(0,-10vh,0) rotate(0) rotateY(0);opacity:0}8%{opacity:.85}
     50%{transform:translate3d(calc(var(--x)*.5),50vh,0) rotate(270deg) rotateY(180deg);opacity:.75}90%{opacity:.6}
@@ -206,7 +266,8 @@ st.markdown("""
   /* ═══ HEADER ═══ */
   h1.love-title{font-family:'Great Vibes',cursive !important;text-align:center;font-size:5.5rem;
     font-weight:600;color:#0B2E1A;margin:0;-webkit-text-stroke:3.5px #fff;paint-order:stroke fill;
-    text-shadow:0 2px 0 rgba(255,255,255,.9),0 4px 16px rgba(11,46,26,.5),0 0 20px rgba(255,255,255,.9),0 0 36px rgba(255,255,255,.5);
+    text-shadow:0 2px 0 rgba(255,255,255,.9),0 4px 16px rgba(11,46,26,.5),
+      0 0 20px rgba(255,255,255,.9),0 0 36px rgba(255,255,255,.5);
     animation:fadeInDown 1s cubic-bezier(.2,.8,.2,1) both}
   p.love-sub{font-family:'Cormorant Garamond',serif !important;font-weight:800;font-style:italic;
     text-align:center;font-size:1.15rem;letter-spacing:.35em;text-transform:uppercase;color:#0B2E1A;
@@ -230,7 +291,8 @@ st.markdown("""
   .tl-card{display:inline-block;padding:18px 26px;border-radius:18px;
     background:rgba(255,255,255,.94);border:2px solid #0B2E1A;box-shadow:0 10px 28px rgba(11,46,26,.32);
     transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s ease,border-color .3s ease,background .3s ease;
-    text-align:inherit;position:relative;overflow:hidden;cursor:pointer;min-width:240px;min-height:96px;transform-style:preserve-3d}
+    text-align:inherit;position:relative;overflow:hidden;cursor:pointer;min-width:240px;min-height:96px;
+    transform-style:preserve-3d}
   .tl-card:hover{transform:translateY(-5px) scale(1.03);background:#fff;border-color:#7a0a1e;
     box-shadow:0 20px 44px rgba(11,46,26,.5)}
   .tl-content{display:block;transition:opacity .25s ease}
@@ -264,7 +326,7 @@ st.markdown("""
   .no-photo-emoji{font-size:3rem;display:block;margin-bottom:10px}
   .no-photo-text{font-family:'Lora',serif;font-style:italic;font-size:1.1rem;color:#04160C}
 
-  /* ═══ ENDING ═══ */
+  /* ═══ ENDING + NOTE ═══ */
   .ending-card{max-width:720px;margin:30px auto 20px auto;padding:34px 40px;border-radius:24px;
     text-align:center;position:relative;overflow:hidden;border-style:dashed;
     animation:fadeInUp 1s .6s cubic-bezier(.2,.8,.2,1) both}
@@ -275,8 +337,6 @@ st.markdown("""
     color:#04160C;line-height:1.75}
   .ending-dots{margin-top:16px;letter-spacing:1em;font-size:1.5rem;color:#c2185b;
     animation:fadeInOut 2.6s ease-in-out infinite}
-
-  /* ═══ LOVE NOTE ═══ */
   .love-note{max-width:720px;margin:10px auto 70px auto;padding:30px 20px;text-align:center;
     animation:fadeInUp 1.2s .9s cubic-bezier(.2,.8,.2,1) both}
   .love-note-line{width:170px;height:2px;margin:0 auto;
@@ -314,7 +374,7 @@ st.markdown("""
     font-size:.85rem;letter-spacing:.28em;text-transform:uppercase;color:#7a0a1e;margin-bottom:8px}
   .detail-empty-story{opacity:.7;font-style:italic}
 
-  /* ═══ BUTTONS ═══ */
+  /* ═══ BUTTONS + INPUTS ═══ */
   .stButton>button{background:linear-gradient(135deg,#0d3b25 0%,#1c6b3f 55%,#2e9e63 100%);
     border:2px solid #062b18;color:#fff;font-family:'Inter',sans-serif;font-weight:700;letter-spacing:.04em;
     border-radius:999px;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.55);
@@ -331,7 +391,6 @@ st.markdown("""
   .stButton>button[kind="primary"]:hover{background:linear-gradient(135deg,#7a0a1e 0%,#a10a4a 45%,#e02a72 100%);
     border-color:#5b0616}
 
-  /* ═══ INPUTS ═══ */
   .stTextInput input,.stTextArea textarea,.stDateInput input{
     background:#fff5f9 !important;color:#3a020f !important;border-radius:14px !important;
     border:2px solid #7a0a1e !important;font-family:'Lora',serif !important;
@@ -366,8 +425,7 @@ st.markdown("""
     text-align:center !important;margin:0 0 8px 0 !important;color:#04160C !important;
     -webkit-text-fill-color:#04160C !important;-webkit-text-stroke:0 !important;opacity:1 !important}
   .danger-box{max-width:720px;margin:16px auto;padding:24px 28px;border-radius:18px;
-    text-align:center;border-style:dashed;background:#fff5f8;
-    animation:fadeInUp .5s ease-out both}
+    text-align:center;border-style:dashed;background:#fff5f8;animation:fadeInUp .5s ease-out both}
   .danger-title{font-family:'Lora',serif;font-style:italic;font-weight:800;font-size:1.4rem;
     color:#7a0a1e;margin:0 0 8px 0}
   .danger-text{font-family:'Lora',serif;font-style:italic;color:#3a020f;font-size:1rem}
@@ -382,56 +440,174 @@ st.markdown("""
     .love-note-text{font-size:2.9rem}.love-note-sub{font-size:.95rem;letter-spacing:.25em}
     .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}}
   @media (prefers-reduced-motion: reduce){
-    .soft-glow,.bokeh,.bubble,.leaf,.petal,.dot,.tl-heart,.ending-heart,.ending-dots,.love-note-text{animation:none !important}}
+    .soft-glow,.bokeh,.bubble,.leaf,.petal,.dot,.tl-heart,.ending-heart,.ending-dots,
+    .love-note-text,.ld-heart,.ld-bar-fill{animation:none !important}}
 </style>
 """, unsafe_allow_html=True)
 
+# ── SKELETON: show loader, then load, then hide ────────────────────────────
+_loader = st.empty()
+_loader.markdown(LOADER_HTML, unsafe_allow_html=True)
+
+MOMENTS = _load()
+
+_loader.empty()   # <-- remove the skeleton as soon as data is ready
+
+# ── PWA + OFFLINE + PARALLAX + TILT + CONFETTI ────────────────────────────
 st.markdown(PARTICLES, unsafe_allow_html=True)
 
-# ── JS ─────────────────────────────────────────────────────────────────────
 components.html("""<script>
 (function(){
-  const p=window.parent.document;
-  const bg=p.getElementById('living-bg');
-  if(bg){let r=false;p.addEventListener('scroll',()=>{if(r)return;r=true;
-    requestAnimationFrame(()=>{const y=p.documentElement.scrollTop||p.body.scrollTop||0;
-      bg.style.transform='translate3d(0,'+(y*0.3)+'px,0)';r=false;});},{passive:true});}
-  if(!matchMedia('(hover: none)').matches){
-    let c=null,rect=null,mx=0,my=0,busy=false;
-    p.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('.tl-card');
-      if(t&&t!==c){c=t;rect=t.getBoundingClientRect();}},{passive:true});
-    p.addEventListener('mouseout',e=>{const t=e.target.closest&&e.target.closest('.tl-card');
-      if(t&&t===c){t.style.transform='';c=null;rect=null;}},{passive:true});
-    p.addEventListener('mousemove',e=>{if(!c)return;mx=e.clientX;my=e.clientY;
-      if(busy)return;busy=true;requestAnimationFrame(()=>{busy=false;if(!c||!rect)return;
-        const x=(mx-rect.left)/rect.width-0.5,y=(my-rect.top)/rect.height-0.5;
-        c.style.transform='perspective(700px) rotateY('+(x*6)+'deg) rotateX('+(-y*6)+
-          'deg) translateY(-5px) scale(1.02)';});},{passive:true});}
-  let last=0;
-  p.addEventListener('click',e=>{const t=e.target;
-    if(t.closest('button,input,textarea,select,[data-testid="stFileUploaderDropzone"]'))return;
-    const now=Date.now();if(now-last<150)return;last=now;
-    const g=['❤️','💖','💕','💗','💘','🌸'];
-    for(let i=0;i<3;i++){const h=p.createElement('span');
-      h.textContent=g[Math.floor(Math.random()*g.length)];
-      h.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;font-size:'+
-        (14+Math.random()*10)+'px;pointer-events:none;z-index:99999;animation:confettiFloat '+
-        (0.9+Math.random()*0.6)+'s ease-out forwards;transform:translate(-50%,-50%);will-change:transform,opacity;';
-      h.style.setProperty('--dx',(Math.random()-0.5)*180+'px');
-      h.style.setProperty('--dy',-(60+Math.random()*100)+'px');
-      p.body.appendChild(h);setTimeout(()=>h.remove(),1600);}
-  },{passive:true});
-  window.parent.postMessage({isStreamlitMessage:true,type:'streamlit:setFrameHeight',height:0},'*');
+  const p = window.parent.document;
+
+  /* ── PWA MANIFEST INJECTION ─────────────────────────────────── */
+  try {
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#e07ba0"/>
+        <stop offset="100%" stop-color="#6fa8d4"/>
+      </linearGradient></defs>
+      <rect width="512" height="512" rx="96" fill="url(#g)"/>
+      <path d="M256 400 C120 300 80 220 80 160 C80 110 120 70 170 70 C210 70 240 95 256 135
+               C272 95 302 70 342 70 C392 70 432 110 432 160 C432 220 392 300 256 400 Z"
+            fill="#fff" stroke="#0B2E1A" stroke-width="14"/>
+      <text x="256" y="480" text-anchor="middle" font-family="sans-serif"
+            font-size="0" fill="#fff">❤</text>
+    </svg>`;
+    const iconData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
+    const manifest = {
+      name: "Our Love Diary", short_name: "Love Diary",
+      start_url: ".", scope: ".",
+      display: "standalone", orientation: "portrait",
+      background_color: "#e07ba0", theme_color: "#e07ba0",
+      description: "A little garden of our favourite moments",
+      icons: [
+        { src: iconData, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+        { src: iconData, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+      ]
+    };
+    const mLink = p.createElement('link');
+    mLink.rel = 'manifest';
+    mLink.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+    p.head.appendChild(mLink);
+
+    const themeMeta = p.createElement('meta');
+    themeMeta.name = 'theme-color';
+    themeMeta.content = '#e07ba0';
+    p.head.appendChild(themeMeta);
+
+    const apple = p.createElement('link');
+    apple.rel = 'apple-touch-icon';
+    apple.href = iconData;
+    p.head.appendChild(apple);
+
+    const appleMobile = p.createElement('meta');
+    appleMobile.name = 'apple-mobile-web-app-capable';
+    appleMobile.content = 'yes';
+    p.head.appendChild(appleMobile);
+
+    const appleStatus = p.createElement('meta');
+    appleStatus.name = 'apple-mobile-web-app-status-bar-style';
+    appleStatus.content = 'default';
+    p.head.appendChild(appleStatus);
+  } catch(e) {}
+
+  /* ── OFFLINE BANNER ─────────────────────────────────────────── */
+  let banner = p.getElementById('offline-banner');
+  if (!banner) {
+    banner = p.createElement('div');
+    banner.id = 'offline-banner';
+    banner.className = 'offline-banner';
+    banner.innerHTML = '<span class="offline-dot"></span> You\\'re offline — will retry when back';
+    p.body.appendChild(banner);
+  }
+  function updateOnline() {
+    if (navigator.onLine) banner.classList.remove('show');
+    else banner.classList.add('show');
+  }
+  window.parent.addEventListener('online', updateOnline);
+  window.parent.addEventListener('offline', updateOnline);
+  updateOnline();
+
+  /* ── PARALLAX ───────────────────────────────────────────────── */
+  const bg = p.getElementById('living-bg');
+  if (bg) {
+    let r = false;
+    p.addEventListener('scroll', () => {
+      if (r) return; r = true;
+      requestAnimationFrame(() => {
+        const y = p.documentElement.scrollTop || p.body.scrollTop || 0;
+        bg.style.transform = 'translate3d(0,' + (y * 0.3) + 'px,0)';
+        r = false;
+      });
+    }, { passive: true });
+  }
+
+  /* ── 3D TILT ────────────────────────────────────────────────── */
+  if (!matchMedia('(hover: none)').matches) {
+    let c = null, rect = null, mx = 0, my = 0, busy = false;
+    p.addEventListener('mouseover', e => {
+      const t = e.target.closest && e.target.closest('.tl-card');
+      if (t && t !== c) { c = t; rect = t.getBoundingClientRect(); }
+    }, { passive: true });
+    p.addEventListener('mouseout', e => {
+      const t = e.target.closest && e.target.closest('.tl-card');
+      if (t && t === c) { t.style.transform = ''; c = null; rect = null; }
+    }, { passive: true });
+    p.addEventListener('mousemove', e => {
+      if (!c) return; mx = e.clientX; my = e.clientY;
+      if (busy) return; busy = true;
+      requestAnimationFrame(() => {
+        busy = false; if (!c || !rect) return;
+        const x = (mx - rect.left) / rect.width - 0.5;
+        const y = (my - rect.top) / rect.height - 0.5;
+        c.style.transform = 'perspective(700px) rotateY(' + (x * 6) + 'deg) rotateX(' +
+          (-y * 6) + 'deg) translateY(-5px) scale(1.02)';
+      });
+    }, { passive: true });
+  }
+
+  /* ── CONFETTI ───────────────────────────────────────────────── */
+  let last = 0;
+  p.addEventListener('click', e => {
+    const t = e.target;
+    if (t.closest('button,input,textarea,select,[data-testid="stFileUploaderDropzone"],a[download]')) return;
+    const now = Date.now(); if (now - last < 150) return; last = now;
+    const g = ['❤️','💖','💕','💗','💘','🌸'];
+    for (let i = 0; i < 3; i++) {
+      const h = p.createElement('span');
+      h.textContent = g[Math.floor(Math.random() * g.length)];
+      h.style.cssText = 'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;font-size:' +
+        (14 + Math.random() * 10) + 'px;pointer-events:none;z-index:99999;animation:confettiFloat ' +
+        (0.9 + Math.random() * 0.6) + 's ease-out forwards;transform:translate(-50%,-50%);' +
+        'will-change:transform,opacity;';
+      h.style.setProperty('--dx', (Math.random() - 0.5) * 180 + 'px');
+      h.style.setProperty('--dy', -(60 + Math.random() * 100) + 'px');
+      p.body.appendChild(h); setTimeout(() => h.remove(), 1600);
+    }
+  }, { passive: true });
+
+  window.parent.postMessage({ isStreamlitMessage: true,
+    type: 'streamlit:setFrameHeight', height: 0 }, '*');
 })();
 </script>""", height=0)
 
 # ── Top bar ────────────────────────────────────────────────────────────────
-_, cb = st.columns([8, 2])
-with cb:
-    if st.button("✚ Add Moment", key="add_btn", use_container_width=True):
-        st.session_state.show_add = True
-        st.session_state.edit = st.session_state.del_mode = False
-        st.query_params.clear(); st.rerun()
+if not _readonly:
+    _, cb = st.columns([8, 2])
+    with cb:
+        if st.button("✚ Add Moment", key="add_btn", use_container_width=True):
+            st.session_state.show_add = True
+            st.session_state.edit = st.session_state.del_mode = False
+            st.query_params.clear(); st.rerun()
+else:
+    st.markdown(
+        '<div style="text-align:center;margin-bottom:6px">'
+        '<span class="mode-pill ' + ('share' if _share else '') + '">'
+        '<span class="dot"></span>'
+        + ('Shared Moment View' if _share else 'Public Read-Only View') +
+        '</span></div>',
+        unsafe_allow_html=True)
 
 # ── Header ─────────────────────────────────────────────────────────────────
 st.markdown('<h1 class="love-title">Our Love Diary</h1>', unsafe_allow_html=True)
@@ -481,8 +657,8 @@ active = st.query_params.get("m")
 HEART = ('M16 28 C4 18 2 12 2 8 C2 4 5 1 9 1 C12 1 15 3 16 6 C17 3 20 1 23 1 '
          'C27 1 30 4 30 8 C30 12 28 18 16 28 Z')
 
-# ═══ 1) ADD MOMENT ═════════════════════════════════════════════════════════
-if st.session_state.show_add:
+# ═══ 1) ADD MOMENT (blocked in readonly) ═══════════════════════════════════
+if st.session_state.show_add and not _readonly:
     if st.button("← Back to diary", key="back_add"):
         st.session_state.show_add = st.session_state.unlocked = False; st.rerun()
     if not st.session_state.unlocked:
@@ -502,27 +678,48 @@ if st.session_state.show_add:
             files = st.file_uploader("Photos (optional)", accept_multiple_files=True,
                                      type=["png","jpg","jpeg","webp","gif"])
             if st.form_submit_button("Save Moment 💾"):
-                if not title.strip(): st.warning("Please enter a title.")
+                if not title.strip():
+                    st.warning("Please enter a title.")
                 else:
-                    add_moment(title, dv.strftime("%d %b %Y"), emoji, about, files or [])
-                    st.success(f"Saved “{title}” 💖")
-                    st.session_state.show_add = st.session_state.unlocked = False; st.rerun()
+                    ok = add_moment(title, dv.strftime("%d %b %Y"), emoji, about, files or [])
+                    if ok:
+                        st.success(f"Saved “{title}” 💖")
+                        st.session_state.show_add = st.session_state.unlocked = False; st.rerun()
+                    else:
+                        st.warning("Couldn't save — you may be offline. Try again when connected.")
 
-# ═══ 2) DETAIL ═════════════════════════════════════════════════════════════
+# ═══ 2) DETAIL PAGE ════════════════════════════════════════════════════════
 elif active and active in MOMENTS:
     m = norm(MOMENTS[active])
-    cb_, _, ce, cd = st.columns([3, 4, 1.2, 1.2])
-    if cb_.button("← Back to timeline", key="back_d"):
-        st.query_params.clear()
-        st.session_state.edit = st.session_state.del_mode = False; st.rerun()
-    if ce.button("✏️ Edit", key="edit_b", use_container_width=True):
-        st.session_state.edit = True; st.session_state.del_mode = False
-        st.session_state.unlocked = False; st.rerun()
-    if cd.button("🗑️ Delete", key="del_b", use_container_width=True, type="primary"):
-        st.session_state.del_mode = True; st.session_state.edit = False
-        st.session_state.unlocked = False; st.rerun()
 
-    if (st.session_state.edit or st.session_state.del_mode) and not st.session_state.unlocked:
+    # top row: back + (edit/delete + share) unless readonly
+    if _readonly:
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            if st.button("← Back to timeline", key="back_d"):
+                st.query_params.clear(); st.rerun()
+        with c2:
+            # Share copy hint
+            st.markdown(
+                '<div style="text-align:right;padding-top:8px">'
+                '<span style="font-family:Inter,sans-serif;font-size:.78rem;'
+                'font-weight:700;color:#04160C;opacity:.7">'
+                'Copy URL to share ↑'
+                '</span></div>',
+                unsafe_allow_html=True)
+    else:
+        cb_, _, ce, cd = st.columns([3, 4, 1.2, 1.2])
+        if cb_.button("← Back to timeline", key="back_d"):
+            st.query_params.clear()
+            st.session_state.edit = st.session_state.del_mode = False; st.rerun()
+        if ce.button("✏️ Edit", key="edit_b", use_container_width=True):
+            st.session_state.edit = True; st.session_state.del_mode = False
+            st.session_state.unlocked = False; st.rerun()
+        if cd.button("🗑️ Delete", key="del_b", use_container_width=True, type="primary"):
+            st.session_state.del_mode = True; st.session_state.edit = False
+            st.session_state.unlocked = False; st.rerun()
+
+    if not _readonly and (st.session_state.edit or st.session_state.del_mode) and not st.session_state.unlocked:
         st.markdown('<div class="add-panel"><h2 class="add-title">🔒 Unlock to continue</h2></div>', unsafe_allow_html=True)
         pwd = st.text_input("Password", type="password", key="pwd_ed")
         c1, c2 = st.columns(2)
@@ -533,7 +730,7 @@ elif active and active in MOMENTS:
             st.session_state.edit = st.session_state.del_mode = False; st.rerun()
         st.stop()
 
-    if st.session_state.del_mode:
+    if not _readonly and st.session_state.del_mode:
         st.markdown(f'<div class="danger-box"><p class="danger-title">🗑️ Delete “{m["title"]}” forever?</p>'
                     '<p class="danger-text">This cannot be undone — the story and all its photos will be gone.</p></div>',
                     unsafe_allow_html=True)
@@ -545,7 +742,7 @@ elif active and active in MOMENTS:
             st.session_state.del_mode = False; st.rerun()
         st.stop()
 
-    if st.session_state.edit:
+    if not _readonly and st.session_state.edit:
         st.markdown('<div class="add-panel"><h2 class="add-title">✏️ Edit this Moment</h2></div>', unsafe_allow_html=True)
         existing = imgs_of(m)
         try: dd = datetime.strptime(m["date"], "%d %b %Y").date()
@@ -580,9 +777,9 @@ elif active and active in MOMENTS:
 
     imgs = [p for p in imgs_of(m) if p]
     if len(imgs) == 1:
-        gal = f'<div class="gallery"><img class="single" src="{imgs[0]}"/></div>'
+        gal = f'<div class="gallery"><img class="single" src="{imgs[0]}" loading="lazy"/></div>'
     elif len(imgs) > 1:
-        gal = '<div class="gallery">' + "".join(f'<img src="{p}"/>' for p in imgs) + '</div>'
+        gal = '<div class="gallery">' + "".join(f'<img src="{p}" loading="lazy"/>' for p in imgs) + '</div>'
     else:
         gal = '<div class="no-photo"><span class="no-photo-emoji">📷</span><div class="no-photo-text">No photos for this moment yet.</div></div>'
 
