@@ -1,16 +1,18 @@
-"""🌿 Avrav Love Diary — Supabase edition (with PWA, offline, share, public)."""
-import pathlib, random, uuid
+"""🌿 Avrav Love Diary — Supabase edition (rich features)."""
+import io, pathlib, random, uuid
 from datetime import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 from supabase import create_client, Client
+from PIL import Image
 
 st.set_page_config(page_title="Our Love Diary", page_icon="❤️", layout="centered")
 
 # ── URL MODES ──────────────────────────────────────────────────────────────
-_share  = st.query_params.get("share") == "1"
-_public = st.query_params.get("public") == "1"
+_share    = st.query_params.get("share") == "1"
+_public   = st.query_params.get("public") == "1"
 _readonly = _share or _public
+_search   = st.query_params.get("q", "").strip()
 
 try:
     SB_URL = st.secrets["SUPABASE_URL"]
@@ -30,9 +32,64 @@ START, PWD = "2026-05-01", "gaurav&avni"
 EMOJIS = ["💖","💌","🌙","☕","💗","✈️","💍","🌸","🎂","🎄","🌊","⭐","🎁","✨"]
 DEFAULTS = {"title": "Untitled Moment", "date": "—", "emoji": "💖", "about": "", "images": []}
 
-for k in ("show_add", "unlocked", "edit", "del_mode"):
-    st.session_state.setdefault(k, False)
-st.session_state.setdefault("pending_writes", [])
+# Ambient tint per emoji (very light)
+AMBIENT = {
+    "💖":("rgba(255,200,220,.35)","rgba(255,140,190,.20)"),
+    "💌":("rgba(255,220,200,.35)","rgba(255,170,150,.20)"),
+    "🌙":("rgba(200,215,255,.35)","rgba(150,170,240,.20)"),
+    "☕":("rgba(220,200,175,.35)","rgba(180,150,120,.20)"),
+    "💗":("rgba(255,190,215,.35)","rgba(255,120,175,.20)"),
+    "✈️":("rgba(200,230,255,.35)","rgba(140,200,245,.20)"),
+    "💍":("rgba(255,235,200,.35)","rgba(240,200,140,.20)"),
+    "🌸":("rgba(255,210,225,.35)","rgba(255,160,200,.20)"),
+    "🎂":("rgba(255,225,210,.35)","rgba(255,180,160,.20)"),
+    "🎄":("rgba(200,240,210,.35)","rgba(150,220,170,.20)"),
+    "🌊":("rgba(190,225,255,.35)","rgba(120,190,240,.20)"),
+    "⭐":("rgba(255,240,200,.35)","rgba(245,215,140,.20)"),
+    "🎁":("rgba(255,210,215,.35)","rgba(245,160,180,.20)"),
+    "✨":("rgba(240,220,255,.35)","rgba(200,170,255,.20)"),
+}
+
+REASONS = [
+    "The way your eyes light up when you talk about your dreams.",
+    "How you remember tiny details I forgot I ever told you.",
+    "The sound of your laugh on a bad day — my favourite medicine.",
+    "The way you hum when you think no one is listening.",
+    "How safe the world feels when you're next to me.",
+    "The tiny crinkle at the corner of your eyes when you smile.",
+    "How you always know exactly what I need before I do.",
+    "The way you argue with me over the last bite — then give it to me anyway.",
+    "How you text me just to say 'thinking of you' for no reason.",
+    "The way you fall asleep mid-conversation — and I let you.",
+    "How proud I feel walking into any room with you.",
+    "The way you make ordinary days feel like tiny celebrations.",
+    "Your terrible jokes that I secretly find hilarious.",
+    "How you always send me songs that make you think of us.",
+    "The way you hold my hand a little tighter when you're nervous.",
+]
+
+for k in ("show_add", "unlocked", "edit", "del_mode", "reason_idx"):
+    st.session_state.setdefault(k, False if k != "reason_idx" else 0)
+
+# ── IMAGE COMPRESSION ──────────────────────────────────────────────────────
+def _compress(data: bytes, max_side: int = 1920, quality: int = 85) -> bytes:
+    try:
+        img = Image.open(io.BytesIO(data))
+        if img.mode in ("RGBA", "P") and not img.mode == "RGB":
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+            img = bg
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+        w, h = img.size
+        if max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=quality, optimize=True)
+        return out.getvalue()
+    except Exception:
+        return data
 
 # ── DATA LAYER ─────────────────────────────────────────────────────────────
 def _load() -> dict:
@@ -60,11 +117,14 @@ def _key_for(title, existing):
 
 def _upload(f):
     ext = (pathlib.Path(f.name).suffix.lower() or ".jpg")[:8]
-    name = f"{uuid.uuid4().hex}{ext}"
+    name = f"{uuid.uuid4().hex}.jpg"
     try:
+        raw = bytes(f.getbuffer())
+        if ext in (".jpg", ".jpeg", ".png", ".webp"):
+            raw = _compress(raw)
         supabase.storage.from_(BUCKET).upload(
-            path=name, file=bytes(f.getbuffer()),
-            file_options={"content-type": f.type or "image/jpeg", "upsert": "true"})
+            path=name, file=raw,
+            file_options={"content-type": "image/jpeg", "upsert": "true"})
         return supabase.storage.from_(BUCKET).get_public_url(name)
     except Exception as e:
         st.error(f"Upload failed — {e}"); return ""
@@ -145,7 +205,6 @@ PARTICLES = (
     '</div>'
 )
 
-# ── SKELETON LOADER ────────────────────────────────────────────────────────
 LOADER_HTML = (
     '<div class="avrav-loader" id="avrav-loader">'
     '<div class="ld-heart">💗</div>'
@@ -165,7 +224,7 @@ st.markdown("""
   .stApp{background:linear-gradient(110deg,#e07ba0 0%,#6fa8d4 100%);background-attachment:fixed}
   .block-container{padding-top:2rem;max-width:1080px;position:relative;z-index:3}
 
-  /* ═══ SKELETON LOADER ═══ */
+  /* ═══ SKELETON ═══ */
   .avrav-loader{position:fixed;inset:0;z-index:99999;
     background:linear-gradient(110deg,#e07ba0 0%,#6fa8d4 100%);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -194,6 +253,43 @@ st.markdown("""
   .offline-dot{width:10px;height:10px;border-radius:50%;background:#ff4d6d;
     box-shadow:0 0 12px #ff4d6d;animation:pulse 1.4s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* ═══ SCROLL-TO-TOP HEART ═══ */
+  .to-top-heart{position:fixed;bottom:26px;right:26px;z-index:9999;
+    width:58px;height:58px;border-radius:50%;
+    background:linear-gradient(135deg,#c2185b 0%,#7a0a1e 100%);
+    color:#fff;font-size:1.5rem;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;pointer-events:auto;
+    border:3px solid #fff;
+    box-shadow:0 10px 28px rgba(122,10,30,.55),0 0 20px rgba(194,24,91,.5);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s ease;
+    opacity:0;transform:translateY(20px) scale(.8)}
+  .to-top-heart.show{opacity:1;transform:translateY(0) scale(1)}
+  .to-top-heart:hover{transform:translateY(-4px) scale(1.08);
+    box-shadow:0 16px 38px rgba(122,10,30,.7),0 0 28px rgba(194,24,91,.7)}
+  .to-top-heart:active{transform:scale(.95)}
+  @media (max-width:680px){.to-top-heart{width:48px;height:48px;bottom:18px;right:18px;font-size:1.25rem}}
+
+  /* ═══ MINI-MAP (right rail of dots) ═══ */
+  .mini-map{position:fixed;top:50%;right:16px;transform:translateY(-50%);
+    z-index:9997;display:flex;flex-direction:column;gap:8px;
+    padding:12px 10px;border-radius:999px;
+    background:rgba(255,255,255,.85);
+    border:2px solid #0B2E1A;
+    box-shadow:0 10px 26px rgba(11,46,26,.3);
+    pointer-events:auto}
+  .mini-map a{display:block;width:12px;height:12px;border-radius:50%;
+    background:rgba(122,10,30,.35);transition:all .25s cubic-bezier(.2,.8,.2,1)}
+  .mini-map a:hover{background:#c2185b;transform:scale(1.5);
+    box-shadow:0 0 10px rgba(194,24,91,.8)}
+  @media (max-width:820px){.mini-map{display:none}}
+
+  /* ═══ SEARCH BAR ═══ */
+  .search-row{margin:8px auto 18px auto;max-width:720px}
+  .search-hint{text-align:center;font-family:'Cormorant Garamond',serif;
+    font-style:italic;font-weight:700;font-size:.95rem;color:#0B2E1A;
+    margin-top:8px;opacity:.75}
 
   /* ═══ BACKGROUND ═══ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
@@ -269,7 +365,8 @@ st.markdown("""
   .timeline::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:4px;transform:translateX(-50%);
     border-radius:4px;background:linear-gradient(180deg,transparent 0%,#0B2E1A 8%,#c2185b 50%,#0B2E1A 92%,transparent 100%)}
   .tl-item{position:relative;width:50%;padding:20px 60px;box-sizing:border-box;opacity:0;transform:translateY(28px);
-    animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:var(--d)}
+    animation:fadeInUp .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:var(--d);
+    scroll-margin-top:80px}
   .tl-item.left{left:0;text-align:right}.tl-item.right{left:50%;text-align:left}
   .tl-heart{position:absolute;top:28px;width:36px;height:36px;z-index:3;
     filter:drop-shadow(0 3px 8px rgba(11,46,26,.5));animation:beat 2.4s ease-in-out infinite}
@@ -325,29 +422,61 @@ st.markdown("""
     color:#04160C;line-height:1.75}
   .ending-dots{margin-top:16px;letter-spacing:1em;font-size:1.5rem;color:#c2185b;
     animation:fadeInOut 2.6s ease-in-out infinite}
-  .love-note{max-width:720px;margin:10px auto 70px auto;padding:30px 20px;text-align:center;
-    animation:fadeInUp 1.2s .9s cubic-bezier(.2,.8,.2,1) both}
-  .love-note-line{width:170px;height:2px;margin:0 auto;
-    background:linear-gradient(90deg,transparent,#0B2E1A 40%,#0B2E1A 60%,transparent);
-    border-radius:2px;opacity:.85}
-  .love-note-text{font-family:'Dancing Script',cursive;font-weight:700;font-size:4.4rem;color:#c2185b;
-    margin:14px 0 8px 0;line-height:1.15;
-    text-shadow:0 0 14px rgba(255,92,138,.7),0 3px 14px rgba(122,10,30,.6),0 2px 0 #fff;
-    -webkit-text-stroke:1.6px #fff;paint-order:stroke fill;
-    animation:lovePulse 3s ease-in-out infinite}
-  .love-note-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:800;
-    font-size:1.15rem;letter-spacing:.35em;text-transform:uppercase;color:#0B2E1A;margin:0 0 18px 0}
+
+  /* ═══ REASONS SLIDER ═══ */
+  .reasons-wrap{max-width:920px;margin:20px auto 6px auto;padding:26px 24px 20px 24px;
+    border-radius:24px;position:relative;overflow:hidden;
+    background:rgba(255,255,255,.94);border:2px solid #0B2E1A;
+    box-shadow:0 14px 36px rgba(11,46,26,.35);
+    animation:fadeInUp 1s .7s cubic-bezier(.2,.8,.2,1) both}
+  .reasons-head{text-align:center;font-family:'Great Vibes',cursive;font-size:2.4rem;
+    color:#0B2E1A;margin:0 0 4px 0;text-shadow:0 2px 8px rgba(194,24,91,.25)}
+  .reasons-sub{text-align:center;font-family:'Cormorant Garamond',serif;
+    font-style:italic;font-weight:700;font-size:.95rem;letter-spacing:.25em;
+    text-transform:uppercase;color:#7a0a1e;margin:0 0 18px 0;opacity:.8}
+  .reasons-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;gap:16px;padding:6px 4px 14px 4px;
+    -ms-overflow-style:none;scrollbar-width:none}
+  .reasons-track::-webkit-scrollbar{display:none}
+  .reason-card{flex:0 0 82%;max-width:82%;scroll-snap-align:center;
+    padding:22px 26px;border-radius:20px;
+    background:linear-gradient(135deg,#fff0f6 0%,#ffe4ee 100%);
+    border:2px solid #7a0a1e;
+    box-shadow:0 10px 26px rgba(122,10,30,.25);
+    font-family:'Lora',serif;font-style:italic;font-weight:600;
+    font-size:1.15rem;line-height:1.65;color:#3a020f;text-align:center}
+  .reason-card .rnum{display:block;font-family:'Cormorant Garamond',serif;
+    font-weight:800;font-size:.72rem;letter-spacing:.3em;color:#c2185b;
+    text-transform:uppercase;margin-bottom:10px;opacity:.85}
+  .reasons-nav{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:6px}
+  .reasons-btn{background:linear-gradient(135deg,#0d3b25 0%,#1c6b3f 55%,#2e9e63 100%);
+    border:2px solid #062b18;color:#fff;
+    width:44px;height:44px;border-radius:50%;
+    font-size:1.15rem;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 16px rgba(6,43,24,.5);
+    transition:transform .2s ease,box-shadow .2s ease;
+    display:flex;align-items:center;justify-content:center;
+    padding:0;line-height:1}
+  .reasons-btn:hover{transform:translateY(-2px) scale(1.06);
+    box-shadow:0 10px 24px rgba(6,43,24,.7)}
+  .reasons-btn:active{transform:scale(.95)}
+  .reasons-count{font-family:'Inter',sans-serif;font-weight:700;font-size:.82rem;
+    color:#3a020f;letter-spacing:.1em;min-width:56px;text-align:center}
 
   /* ═══ DETAIL ═══ */
-  .detail-wrap{max-width:880px;margin:10px auto 40px auto;animation:fadeInUp .8s cubic-bezier(.2,.8,.2,1) both}
-  .detail-hero{text-align:center;margin:10px 0 18px 0}
-  .detail-emoji{font-size:3.5rem;display:block;margin-bottom:6px;filter:drop-shadow(0 4px 12px rgba(11,46,26,.5))}
+  .detail-wrap{max-width:880px;margin:10px auto 40px auto;position:relative;
+    animation:fadeInUp .8s cubic-bezier(.2,.8,.2,1) both}
+  .detail-ambient{position:absolute;inset:-40px -20px;border-radius:40px;
+    pointer-events:none;z-index:-1;filter:blur(30px);opacity:.65}
+  .detail-hero{text-align:center;margin:10px 0 18px 0;position:relative;z-index:1}
+  .detail-emoji{font-size:3.5rem;display:block;margin-bottom:6px;
+    filter:drop-shadow(0 4px 12px rgba(11,46,26,.5))}
   .detail-title{font-family:'Lora',serif;font-style:italic;font-weight:700;font-size:2.8rem;
     color:#04160C;margin:6px 0 12px 0;line-height:1.15;text-shadow:0 2px 12px rgba(255,255,255,.9)}
   .detail-date{display:inline-block;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;
     font-size:1rem;letter-spacing:.28em;text-transform:uppercase;color:#4a0312;padding:6px 20px;
     border-radius:999px;background:#ffd9e8;border:2px solid #7a0a1e;box-shadow:0 6px 18px rgba(122,10,30,.3)}
-  .gallery{display:grid;gap:14px;margin:24px auto 22px auto;max-width:820px;
+  .gallery{display:grid;gap:14px;margin:24px auto 22px auto;max-width:820px;position:relative;z-index:1;
     grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
   .gallery img{width:100%;height:220px;object-fit:cover;border-radius:18px;border:3px solid #0B2E1A;
     box-shadow:0 14px 32px rgba(11,46,26,.5);
@@ -357,7 +486,7 @@ st.markdown("""
   .gallery img.single{grid-column:1/-1;height:auto;max-height:520px}
   .detail-about{max-width:820px;margin:0 auto;padding:28px 32px;border-radius:20px;
     font-family:'Lora',serif;font-style:italic;font-weight:500;font-size:1.2rem;line-height:1.85;
-    color:#04160C;position:relative;overflow:hidden}
+    color:#04160C;position:relative;overflow:hidden;z-index:1}
   .detail-label{display:block;font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:800;
     font-size:.85rem;letter-spacing:.28em;text-transform:uppercase;color:#7a0a1e;margin-bottom:8px}
   .detail-empty-story{opacity:.7;font-style:italic}
@@ -418,6 +547,19 @@ st.markdown("""
     color:#7a0a1e;margin:0 0 8px 0}
   .danger-text{font-family:'Lora',serif;font-style:italic;color:#3a020f;font-size:1rem}
 
+  .love-note{max-width:720px;margin:24px auto 70px auto;padding:30px 20px;text-align:center;
+    animation:fadeInUp 1.2s .9s cubic-bezier(.2,.8,.2,1) both}
+  .love-note-line{width:170px;height:2px;margin:0 auto;
+    background:linear-gradient(90deg,transparent,#0B2E1A 40%,#0B2E1A 60%,transparent);
+    border-radius:2px;opacity:.85}
+  .love-note-text{font-family:'Dancing Script',cursive;font-weight:700;font-size:4.4rem;color:#c2185b;
+    margin:14px 0 8px 0;line-height:1.15;
+    text-shadow:0 0 14px rgba(255,92,138,.7),0 3px 14px rgba(122,10,30,.6),0 2px 0 #fff;
+    -webkit-text-stroke:1.6px #fff;paint-order:stroke fill;
+    animation:lovePulse 3s ease-in-out infinite}
+  .love-note-sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:800;
+    font-size:1.15rem;letter-spacing:.35em;text-transform:uppercase;color:#0B2E1A;margin:0 0 18px 0}
+
   @media (max-width:680px){
     .timeline::before{left:22px}
     .tl-item{width:100%;left:0 !important;text-align:left !important;padding:18px 20px 18px 62px}
@@ -426,29 +568,48 @@ st.markdown("""
     .tl-hover-text{font-size:1.3rem}.gallery{grid-template-columns:1fr}
     h1.love-title{font-size:3.6rem;-webkit-text-stroke:3px #fff}
     .love-note-text{font-size:2.9rem}.love-note-sub{font-size:.95rem;letter-spacing:.25em}
-    .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}}
+    .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}
+    .reason-card{flex:0 0 92%;max-width:92%;font-size:1.02rem;padding:18px 20px}
+    .reasons-head{font-size:2rem}}
   @media (prefers-reduced-motion: reduce){
     .soft-glow,.bokeh,.bubble,.leaf,.petal,.dot,.tl-heart,.ending-heart,.ending-dots,
     .love-note-text,.ld-heart,.ld-bar-fill{animation:none !important}}
 </style>
 """, unsafe_allow_html=True)
 
-# ── SKELETON: show loader, then load, then hide ────────────────────────────
+# ── SKELETON → LOAD → HIDE ─────────────────────────────────────────────────
 _loader = st.empty()
 _loader.markdown(LOADER_HTML, unsafe_allow_html=True)
-
 MOMENTS = _load()
+_loader.empty()
 
-_loader.empty()   # <-- remove the skeleton as soon as data is ready
-
-# ── BACKGROUND + PWA + OFFLINE + JS INTERACTIONS ──────────────────────────
+# ── BG + SCROLL HEART + PWA + OFFLINE + JS ────────────────────────────────
 st.markdown(PARTICLES, unsafe_allow_html=True)
 
 components.html("""<script>
 (function(){
   const p = window.parent.document;
 
-  /* ── PWA MANIFEST INJECTION ─────────────────────────────────── */
+  /* ── SCROLL-TO-TOP HEART ───────────────────────────────────── */
+  let heart = p.getElementById('to-top-heart');
+  if (!heart) {
+    heart = p.createElement('div');
+    heart.id = 'to-top-heart';
+    heart.className = 'to-top-heart';
+    heart.innerHTML = '❤️';
+    heart.title = 'Back to top';
+    heart.onclick = () => window.parent.scrollTo({ top: 0, behavior: 'smooth' });
+    p.body.appendChild(heart);
+  }
+  function toggleHeart() {
+    const y = p.documentElement.scrollTop || p.body.scrollTop || 0;
+    if (y > 400) heart.classList.add('show');
+    else heart.classList.remove('show');
+  }
+  p.addEventListener('scroll', toggleHeart, { passive: true });
+  toggleHeart();
+
+  /* ── PWA MANIFEST ─────────────────────────────────────────── */
   try {
     const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
       <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
@@ -458,15 +619,11 @@ components.html("""<script>
       <rect width="512" height="512" rx="96" fill="url(#g)"/>
       <path d="M256 400 C120 300 80 220 80 160 C80 110 120 70 170 70 C210 70 240 95 256 135
                C272 95 302 70 342 70 C392 70 432 110 432 160 C432 220 392 300 256 400 Z"
-            fill="#fff" stroke="#0B2E1A" stroke-width="14"/>
-      <text x="256" y="480" text-anchor="middle" font-family="sans-serif"
-            font-size="0" fill="#fff">❤</text>
-    </svg>`;
+            fill="#fff" stroke="#0B2E1A" stroke-width="14"/></svg>`;
     const iconData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
     const manifest = {
       name: "Our Love Diary", short_name: "Love Diary",
-      start_url: ".", scope: ".",
-      display: "standalone", orientation: "portrait",
+      start_url: ".", scope: ".", display: "standalone", orientation: "portrait",
       background_color: "#e07ba0", theme_color: "#e07ba0",
       description: "A little garden of our favourite moments",
       icons: [
@@ -479,28 +636,17 @@ components.html("""<script>
     mLink.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
     p.head.appendChild(mLink);
 
-    const themeMeta = p.createElement('meta');
-    themeMeta.name = 'theme-color';
-    themeMeta.content = '#e07ba0';
-    p.head.appendChild(themeMeta);
-
+    ['theme-color:#e07ba0','apple-mobile-web-app-capable:yes',
+     'apple-mobile-web-app-status-bar-style:default'].forEach(pair => {
+      const [name, content] = pair.split(':');
+      const m = p.createElement('meta');
+      m.name = name; m.content = content; p.head.appendChild(m);
+    });
     const apple = p.createElement('link');
-    apple.rel = 'apple-touch-icon';
-    apple.href = iconData;
-    p.head.appendChild(apple);
-
-    const appleMobile = p.createElement('meta');
-    appleMobile.name = 'apple-mobile-web-app-capable';
-    appleMobile.content = 'yes';
-    p.head.appendChild(appleMobile);
-
-    const appleStatus = p.createElement('meta');
-    appleStatus.name = 'apple-mobile-web-app-status-bar-style';
-    appleStatus.content = 'default';
-    p.head.appendChild(appleStatus);
+    apple.rel = 'apple-touch-icon'; apple.href = iconData; p.head.appendChild(apple);
   } catch(e) {}
 
-  /* ── OFFLINE BANNER ─────────────────────────────────────────── */
+  /* ── OFFLINE BANNER ───────────────────────────────────────── */
   let banner = p.getElementById('offline-banner');
   if (!banner) {
     banner = p.createElement('div');
@@ -517,7 +663,7 @@ components.html("""<script>
   window.parent.addEventListener('offline', updateOnline);
   updateOnline();
 
-  /* ── PARALLAX ───────────────────────────────────────────────── */
+  /* ── PARALLAX ─────────────────────────────────────────────── */
   const bg = p.getElementById('living-bg');
   if (bg) {
     let r = false;
@@ -531,7 +677,7 @@ components.html("""<script>
     }, { passive: true });
   }
 
-  /* ── 3D TILT ────────────────────────────────────────────────── */
+  /* ── 3D TILT ──────────────────────────────────────────────── */
   if (!matchMedia('(hover: none)').matches) {
     let c = null, rect = null, mx = 0, my = 0, busy = false;
     p.addEventListener('mouseover', e => {
@@ -555,20 +701,20 @@ components.html("""<script>
     }, { passive: true });
   }
 
-  /* ── CONFETTI ───────────────────────────────────────────────── */
+  /* ── CONFETTI ─────────────────────────────────────────────── */
   let last = 0;
   p.addEventListener('click', e => {
     const t = e.target;
-    if (t.closest('button,input,textarea,select,[data-testid="stFileUploaderDropzone"],a[download]')) return;
+    if (t.closest('button,input,textarea,select,[data-testid="stFileUploaderDropzone"],a[download],.to-top-heart,.reasons-btn')) return;
     const now = Date.now(); if (now - last < 150) return; last = now;
     const g = ['❤️','💖','💕','💗','💘','🌸'];
     for (let i = 0; i < 3; i++) {
       const h = p.createElement('span');
       h.textContent = g[Math.floor(Math.random() * g.length)];
-      h.style.cssText = 'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY + 'px;font-size:' +
-        (14 + Math.random() * 10) + 'px;pointer-events:none;z-index:99999;animation:confettiFloat ' +
-        (0.9 + Math.random() * 0.6) + 's ease-out forwards;transform:translate(-50%,-50%);' +
-        'will-change:transform,opacity;';
+      h.style.cssText = 'position:fixed;left:' + e.clientX + 'px;top:' + e.clientY +
+        'px;font-size:' + (14 + Math.random() * 10) + 'px;pointer-events:none;z-index:99999;' +
+        'animation:confettiFloat ' + (0.9 + Math.random() * 0.6) + 's ease-out forwards;' +
+        'transform:translate(-50%,-50%);will-change:transform,opacity;';
       h.style.setProperty('--dx', (Math.random() - 0.5) * 180 + 'px');
       h.style.setProperty('--dy', -(60 + Math.random() * 100) + 'px');
       p.body.appendChild(h); setTimeout(() => h.remove(), 1600);
@@ -582,8 +728,14 @@ components.html("""<script>
 
 # ── Top bar ────────────────────────────────────────────────────────────────
 if not _readonly:
-    _, cb = st.columns([8, 2])
-    with cb:
+    c1, c2 = st.columns([6, 4])
+    with c1:
+        if st.button("🎲 Surprise me", key="rand_btn", use_container_width=True):
+            if MOMENTS:
+                st.query_params["m"] = random.choice(list(MOMENTS.keys()))
+                st.query_params["r"] = str(random.randint(0, 999))
+                st.rerun()
+    with c2:
         if st.button("✚ Add Moment", key="add_btn", use_container_width=True):
             st.session_state.show_add = True
             st.session_state.edit = st.session_state.del_mode = False
@@ -637,7 +789,7 @@ active = st.query_params.get("m")
 HEART = ('M16 28 C4 18 2 12 2 8 C2 4 5 1 9 1 C12 1 15 3 16 6 C17 3 20 1 23 1 '
          'C27 1 30 4 30 8 C30 12 28 18 16 28 Z')
 
-# ═══ 1) ADD MOMENT (blocked in readonly) ═══════════════════════════════════
+# ═══ 1) ADD MOMENT ═════════════════════════════════════════════════════════
 if st.session_state.show_add and not _readonly:
     if st.button("← Back to diary", key="back_add"):
         st.session_state.show_add = st.session_state.unlocked = False; st.rerun()
@@ -655,7 +807,7 @@ if st.session_state.show_add and not _readonly:
             emoji = c2.selectbox("Emoji", EMOJIS)
             dv = st.date_input("Date", value=datetime.now())
             about = st.text_area("Our Story", height=160, placeholder="Write everything you remember…")
-            files = st.file_uploader("Photos (optional)", accept_multiple_files=True,
+            files = st.file_uploader("Photos (auto-compressed)", accept_multiple_files=True,
                                      type=["png","jpg","jpeg","webp","gif"])
             if st.form_submit_button("Save Moment 💾"):
                 if not title.strip():
@@ -672,20 +824,43 @@ if st.session_state.show_add and not _readonly:
 elif active and active in MOMENTS:
     m = norm(MOMENTS[active])
 
+    # ── PREV / NEXT navigation ─────────────────────────────────────
+    slugs = list(MOMENTS.keys())
+    idx = slugs.index(active)
+    prev_slug = slugs[idx - 1] if idx > 0 else None
+    next_slug = slugs[idx + 1] if idx < len(slugs) - 1 else None
+
     if _readonly:
-        if st.button("← Back to timeline", key="back_d"):
-            st.query_params.clear(); st.rerun()
+        c1, c2, c3 = st.columns([2, 1, 2])
+        with c1:
+            if prev_slug and st.button("← Previous", key="prev_top", use_container_width=True):
+                st.query_params["m"] = prev_slug; st.rerun()
+        with c2:
+            if st.button("⌂ Home", key="home_top", use_container_width=True):
+                st.query_params.clear(); st.rerun()
+        with c3:
+            if next_slug and st.button("Next →", key="next_top", use_container_width=True):
+                st.query_params["m"] = next_slug; st.rerun()
     else:
-        cb_, _, ce, cd = st.columns([3, 4, 1.2, 1.2])
-        if cb_.button("← Back to timeline", key="back_d"):
-            st.query_params.clear()
-            st.session_state.edit = st.session_state.del_mode = False; st.rerun()
-        if ce.button("✏️ Edit", key="edit_b", use_container_width=True):
-            st.session_state.edit = True; st.session_state.del_mode = False
-            st.session_state.unlocked = False; st.rerun()
-        if cd.button("🗑️ Delete", key="del_b", use_container_width=True, type="primary"):
-            st.session_state.del_mode = True; st.session_state.edit = False
-            st.session_state.unlocked = False; st.rerun()
+        c1, c2, c3, c4, c5 = st.columns([1.2, 1.2, 3, 1.2, 1.2])
+        with c1:
+            if prev_slug and st.button("←", key="prev_top", use_container_width=True, help="Previous moment"):
+                st.query_params["m"] = prev_slug; st.rerun()
+        with c2:
+            if next_slug and st.button("→", key="next_top", use_container_width=True, help="Next moment"):
+                st.query_params["m"] = next_slug; st.rerun()
+        with c4:
+            if st.button("✏️ Edit", key="edit_b", use_container_width=True):
+                st.session_state.edit = True; st.session_state.del_mode = False
+                st.session_state.unlocked = False; st.rerun()
+        with c5:
+            if st.button("🗑️ Delete", key="del_b", use_container_width=True, type="primary"):
+                st.session_state.del_mode = True; st.session_state.edit = False
+                st.session_state.unlocked = False; st.rerun()
+        with c3:
+            if st.button("← Back to timeline", key="back_d", use_container_width=True):
+                st.query_params.clear()
+                st.session_state.edit = st.session_state.del_mode = False; st.rerun()
 
     if not _readonly and (st.session_state.edit or st.session_state.del_mode) and not st.session_state.unlocked:
         st.markdown('<div class="add-panel"><h2 class="add-title">🔒 Unlock to continue</h2></div>', unsafe_allow_html=True)
@@ -730,7 +905,7 @@ elif active and active in MOMENTS:
             keep = st.multiselect("Keep which existing photos?", list(range(len(existing))),
                                   list(range(len(existing))),
                                   format_func=lambda i: f"Photo {i+1}") if existing else []
-            nf = st.file_uploader("Add new photos (optional)", accept_multiple_files=True,
+            nf = st.file_uploader("Add new photos (auto-compressed)", accept_multiple_files=True,
                                   type=["png","jpg","jpeg","webp","gif"])
             cs, cc = st.columns(2)
             if cs.form_submit_button("Save changes 💾", use_container_width=True):
@@ -743,6 +918,8 @@ elif active and active in MOMENTS:
                 st.session_state.edit = st.session_state.unlocked = False; st.rerun()
         st.stop()
 
+    # Ambient theme for detail view
+    tint = AMBIENT.get(m["emoji"], AMBIENT["💖"])
     imgs = [p for p in imgs_of(m) if p]
     if len(imgs) == 1:
         gal = f'<div class="gallery"><img class="single" src="{imgs[0]}" loading="lazy"/></div>'
@@ -753,12 +930,28 @@ elif active and active in MOMENTS:
 
     story = m["about"] or '<span class="detail-empty-story">No story written yet.</span>'
     st.markdown(f"""<div class="detail-wrap">
+      <div class="detail-ambient" style="background:radial-gradient(circle at 30% 20%, {tint[0]} 0%, transparent 60%),
+                                              radial-gradient(circle at 70% 80%, {tint[1]} 0%, transparent 60%)"></div>
       <div class="detail-hero"><span class="detail-emoji">{m['emoji']}</span>
         <div class="detail-title">{m['title']}</div>
         <span class="detail-date">{m['date']}</span></div>
       {gal}
       <div class="detail-about"><span class="detail-label">Our Story</span>{story}</div>
     </div>""", unsafe_allow_html=True)
+
+    # Bottom prev/next
+    if prev_slug or next_slug:
+        st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+        cp, cm, cn = st.columns([2, 1, 2])
+        with cp:
+            if prev_slug and st.button("← Previous moment", key="prev_bot", use_container_width=True):
+                st.query_params["m"] = prev_slug; st.rerun()
+        with cm:
+            if st.button("⌂ Home", key="home_bot", use_container_width=True):
+                st.query_params.clear(); st.rerun()
+        with cn:
+            if next_slug and st.button("Next moment →", key="next_bot", use_container_width=True):
+                st.query_params["m"] = next_slug; st.rerun()
 
 # ═══ 3) TIMELINE ═══════════════════════════════════════════════════════════
 else:
@@ -770,30 +963,101 @@ else:
             to write the very first page of our diary.</div>
           <div class="empty-hint">✚ Add Moment</div></div>""", unsafe_allow_html=True)
     else:
-        items = "".join(
-            f'<div class="tl-item {"left" if i%2==0 else "right"}" style="--d:{i*.12:.2f}s">'
-            f'<div class="tl-heart"><svg viewBox="0 0 32 32"><defs>'
-            f'<radialGradient id="hg{i}" cx="35%" cy="30%" r="75%">'
-            f'<stop offset="0%" stop-color="#ffd0e0"/><stop offset="55%" stop-color="#c2185b"/>'
-            f'<stop offset="100%" stop-color="#6b0f2e"/></radialGradient></defs>'
-            f'<path d="{HEART}" fill="url(#hg{i})" stroke="#fff" stroke-width="2.5"/></svg></div>'
-            f'<a class="tl-card" href="?m={k}"><div class="tl-content">'
-            f'<span class="tl-emoji">{norm(m)["emoji"]}</span>'
-            f'<div class="tl-title">{norm(m)["title"]}</div>'
-            f'<div class="tl-date">{norm(m)["date"]}</div></div>'
-            f'<span class="tl-hover-text">Visit The Moment</span></a></div>'
-            for i, (k, m) in enumerate(MOMENTS.items()))
-        st.markdown(f'<div class="timeline">{items}</div>', unsafe_allow_html=True)
+        # ── SEARCH BAR ──────────────────────────────────────────────
+        with st.form("search_form", clear_on_submit=False):
+            sc1, sc2 = st.columns([5, 1])
+            with sc1:
+                q = st.text_input("Search", value=_search,
+                                  placeholder="🔍  Search titles and stories…",
+                                  label_visibility="collapsed",
+                                  key="search_input")
+            with sc2:
+                submitted = st.form_submit_button("Go", use_container_width=True)
+            if submitted:
+                if q.strip():
+                    st.query_params["q"] = q.strip()
+                else:
+                    st.query_params.pop("q", None)
+                st.rerun()
 
+        # Filter
+        if _search:
+            sl = _search.lower()
+            filtered = {k: v for k, v in MOMENTS.items()
+                        if sl in (v.get("title") or "").lower()
+                        or sl in (v.get("about") or "").lower()}
+            st.markdown(
+                f'<div class="search-hint">'
+                f'Showing <b>{len(filtered)}</b> of {len(MOMENTS)} '
+                f'for “{_search}” &nbsp;·&nbsp; '
+                f'<a href="?" style="color:#c2185b;text-decoration:underline">clear</a>'
+                f'</div>',
+                unsafe_allow_html=True)
+        else:
+            filtered = MOMENTS
+
+        # ── TIMELINE ────────────────────────────────────────────────
+        if not filtered:
+            st.markdown('<div class="empty-state"><span class="empty-emoji">🔍</span>'
+                        '<div class="empty-title">No moments match</div>'
+                        '<div class="empty-text">Try another word, or clear the search.</div></div>',
+                        unsafe_allow_html=True)
+        else:
+            items = "".join(
+                f'<div class="tl-item {"left" if i%2==0 else "right"}" '
+                f'id="mm-{i}" style="--d:{i*.12:.2f}s">'
+                f'<div class="tl-heart"><svg viewBox="0 0 32 32"><defs>'
+                f'<radialGradient id="hg{i}" cx="35%" cy="30%" r="75%">'
+                f'<stop offset="0%" stop-color="#ffd0e0"/><stop offset="55%" stop-color="#c2185b"/>'
+                f'<stop offset="100%" stop-color="#6b0f2e"/></radialGradient></defs>'
+                f'<path d="{HEART}" fill="url(#hg{i})" stroke="#fff" stroke-width="2.5"/></svg></div>'
+                f'<a class="tl-card" href="?m={k}"><div class="tl-content">'
+                f'<span class="tl-emoji">{norm(m)["emoji"]}</span>'
+                f'<div class="tl-title">{norm(m)["title"]}</div>'
+                f'<div class="tl-date">{norm(m)["date"]}</div></div>'
+                f'<span class="tl-hover-text">Visit The Moment</span></a></div>'
+                for i, (k, m) in enumerate(filtered.items()))
+            st.markdown(f'<div class="timeline">{items}</div>', unsafe_allow_html=True)
+
+            # ── MINI-MAP (only when not filtering) ──────────────────
+            if not _search:
+                dots = "".join(f'<a href="?m={k}" title="{norm(m)["title"][:30]}"></a>'
+                               for k, m in filtered.items())
+                st.markdown(f'<div class="mini-map">{dots}</div>', unsafe_allow_html=True)
+
+        st.markdown(
+            '<div class="ending-card">'
+            '<span class="ending-heart">❤️</span>'
+            '<div class="ending-title">And the story continues…</div>'
+            '<div class="ending-text">Every day with you becomes another page. '
+            'These are just the ones we\'ve written so far — there are so many more chapters '
+            'still waiting for us.</div>'
+            '<div class="ending-dots">• • •</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # ── REASONS SLIDER (left to right) ──────────────────────────
+        reasons_html = "".join(
+            f'<div class="reason-card"><span class="rnum">Reason {i+1}</span>{r}</div>'
+            for i, r in enumerate(REASONS)
+        )
+        st.markdown(
+            f'<div class="reasons-wrap">'
+            f'<h2 class="reasons-head">Reasons I Love You</h2>'
+            f'<div class="reasons-sub">— swipe left &nbsp;·&nbsp; right —</div>'
+            f'<div class="reasons-track" id="reasonsTrack">{reasons_html}</div>'
+            f'<div class="reasons-nav">'
+            f'<button class="reasons-btn" onclick="(function(){{var t=document.getElementById(\'reasonsTrack\');t.scrollBy({{left:-t.clientWidth*0.84,behavior:\'smooth\'}});}})()">←</button>'
+            f'<span class="reasons-count">✦</span>'
+            f'<button class="reasons-btn" onclick="(function(){{var t=document.getElementById(\'reasonsTrack\');t.scrollBy({{left:t.clientWidth*0.84,behavior:\'smooth\'}});}})()">→</button>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── LOVE NOTE — always LAST ────────────────────────────────────
     st.markdown(
-        '<div class="ending-card">'
-        '<span class="ending-heart">❤️</span>'
-        '<div class="ending-title">And the story continues…</div>'
-        '<div class="ending-text">Every day with you becomes another page. '
-        'These are just the ones we\'ve written so far — there are so many more chapters '
-        'still waiting for us.</div>'
-        '<div class="ending-dots">• • •</div>'
-        '</div>'
         '<div class="love-note">'
         '<div class="love-note-line"></div>'
         '<div class="love-note-text">I Love You Avni!!</div>'
