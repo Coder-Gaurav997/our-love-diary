@@ -145,6 +145,27 @@ PARTICLES = (
     '</div>'
 )
 
+st.markdown(
+    '<div class="page-frame"></div>'
+    '<div class="page-flowers">'
+    '<span class="c" style="top:0;left:0">🌸</span>'
+    '<span class="c" style="top:0;right:0">🌺</span>'
+    '<span class="c" style="bottom:0;left:0">🌻</span>'
+    '<span class="c" style="bottom:0;right:0">🌷</span>'
+    '<span class="e" style="top:0;left:25%">🌺</span>'
+    '<span class="e" style="top:0;left:50%">🌸</span>'
+    '<span class="e" style="top:0;left:75%">🌷</span>'
+    '<span class="e" style="bottom:0;left:25%">🌸</span>'
+    '<span class="e" style="bottom:0;left:50%">🌺</span>'
+    '<span class="e" style="bottom:0;left:75%">🌻</span>'
+    '<span class="e" style="top:33%;left:0">🌷</span>'
+    '<span class="e" style="top:66%;left:0">🌸</span>'
+    '<span class="e" style="top:33%;right:0">🌺</span>'
+    '<span class="e" style="top:66%;right:0">🌻</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
 # ── SKELETON LOADER placeholder (rendered now, removed after data loads) ──
 LOADER_HTML = (
     '<div class="avrav-loader" id="avrav-loader">'
