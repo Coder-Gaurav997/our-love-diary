@@ -539,20 +539,30 @@ components.html("""<script>
     }
   }, {passive:true});
 
-  function attachReasons() {
+    function attachReasons() {
     const track = p.getElementById('reasonsTrack');
-    const prev = p.getElementById('reasonsPrev');
-    const next = p.getElementById('reasonsNext');
+    const prev  = p.getElementById('reasonsPrev');
+    const next  = p.getElementById('reasonsNext');
     if (!track || !prev || !next) return false;
-    const step = () => track.clientWidth * 0.84;
-    prev.onclick = () => track.scrollBy({left:-step(), behavior:'smooth'});
-    next.onclick = () => track.scrollBy({left: step(), behavior:'smooth'});
+    if (prev.dataset.bound === '1') return true;   /* already bound */
+    prev.dataset.bound = '1';
+    next.dataset.bound = '1';
+    const step = () => Math.max(track.clientWidth * 0.84, 240);
+    prev.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      track.scrollBy({ left: -step(), behavior: 'smooth' });
+    });
+    next.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      track.scrollBy({ left:  step(), behavior: 'smooth' });
+    });
     return true;
   }
-  if (!attachReasons()) {
-    let tries = 0;
-    const t = setInterval(() => { if (attachReasons() || ++tries > 30) clearInterval(t); }, 100);
-  }
+
+  /* Attach now if already in DOM, then keep watching for Streamlit renders */
+  attachReasons();
+  const observer = new MutationObserver(() => attachReasons());
+  observer.observe(p.body, { childList: true, subtree: true });
 
   window.parent.postMessage({isStreamlitMessage:true,type:'streamlit:setFrameHeight',height:0}, '*');
 })();
