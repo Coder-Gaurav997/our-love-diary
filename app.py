@@ -145,28 +145,7 @@ PARTICLES = (
     '</div>'
 )
 
-st.markdown(
-    '<div class="page-frame"></div>'
-    '<div class="page-flowers">'
-    '<span class="c" style="top:0;left:0">🌸</span>'
-    '<span class="c" style="top:0;right:0">🌺</span>'
-    '<span class="c" style="bottom:0;left:0">🌻</span>'
-    '<span class="c" style="bottom:0;right:0">🌷</span>'
-    '<span class="e" style="top:0;left:25%">🌺</span>'
-    '<span class="e" style="top:0;left:50%">🌸</span>'
-    '<span class="e" style="top:0;left:75%">🌷</span>'
-    '<span class="e" style="bottom:0;left:25%">🌸</span>'
-    '<span class="e" style="bottom:0;left:50%">🌺</span>'
-    '<span class="e" style="bottom:0;left:75%">🌻</span>'
-    '<span class="e" style="top:33%;left:0">🌷</span>'
-    '<span class="e" style="top:66%;left:0">🌸</span>'
-    '<span class="e" style="top:33%;right:0">🌺</span>'
-    '<span class="e" style="top:66%;right:0">🌻</span>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-# ── SKELETON LOADER placeholder (rendered now, removed after data loads) ──
+# ── SKELETON LOADER ────────────────────────────────────────────────────────
 LOADER_HTML = (
     '<div class="avrav-loader" id="avrav-loader">'
     '<div class="ld-heart">💗</div>'
@@ -215,18 +194,6 @@ st.markdown("""
   .offline-dot{width:10px;height:10px;border-radius:50%;background:#ff4d6d;
     box-shadow:0 0 12px #ff4d6d;animation:pulse 1.4s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-
-  /* ═══ PUBLIC/SHARE PILL ═══ */
-  .mode-pill{display:inline-flex;align-items:center;gap:8px;
-    padding:8px 18px;border-radius:999px;
-    background:rgba(255,255,255,.94);border:2px solid #0B2E1A;
-    font-family:'Inter',sans-serif;font-weight:700;font-size:.82rem;
-    letter-spacing:.1em;text-transform:uppercase;color:#04160C;
-    box-shadow:0 6px 18px rgba(11,46,26,.28);
-    margin:0 auto 12px auto}
-  .mode-pill .dot{width:8px;height:8px;border-radius:50%;background:#2e9e63;
-    box-shadow:0 0 8px rgba(46,158,99,.8)}
-  .mode-pill.share .dot{background:#c2185b;box-shadow:0 0 8px rgba(194,24,91,.8)}
 
   /* ═══ BACKGROUND ═══ */
   .living-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;
@@ -283,6 +250,65 @@ st.markdown("""
   @keyframes lovePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
   @keyframes confettiFloat{0%{opacity:1;transform:translate(-50%,-50%) scale(.8)}
     100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.4) rotate(15deg)}}
+
+  /* ═══ DECORATIVE FLOWER FRAME ═══ */
+  .page-frame{
+    position:fixed !important;
+    top:8px !important;right:8px !important;
+    bottom:8px !important;left:8px !important;
+    width:auto !important;height:auto !important;
+    max-width:none !important;max-height:none !important;
+    z-index:9998 !important;pointer-events:none;
+    border-radius:26px;
+    padding:8px;
+    box-sizing:border-box;
+    background:linear-gradient(135deg,
+      #ffb8d4 0%, #f28bb5 12%, #c2185b 24%,
+      #ffd6e8 38%, #b39ddb 52%, #6fa8d4 66%,
+      #4caf50 80%, #ffb8d4 100%);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite:exclude;
+    filter:drop-shadow(0 0 14px rgba(255,140,190,.75))
+           drop-shadow(0 0 30px rgba(194,24,91,.4));
+    animation:frameHue 24s linear infinite}
+
+  @keyframes frameHue{
+    0%,100%{filter:drop-shadow(0 0 14px rgba(255,140,190,.75))
+                    drop-shadow(0 0 30px rgba(194,24,91,.4)) hue-rotate(0deg)}
+    50%    {filter:drop-shadow(0 0 22px rgba(255,140,190,.95))
+                    drop-shadow(0 0 42px rgba(194,24,91,.55)) hue-rotate(25deg)}}
+
+  .page-flowers{
+    position:fixed !important;
+    top:8px !important;right:8px !important;
+    bottom:8px !important;left:8px !important;
+    width:auto !important;height:auto !important;
+    max-width:none !important;max-height:none !important;
+    z-index:9999 !important;
+    pointer-events:none;
+    border-radius:26px}
+
+  .page-flowers span{
+    position:absolute;line-height:1;
+    filter:drop-shadow(0 3px 7px rgba(0,0,0,.5));
+    animation:flowerSway 4.5s ease-in-out infinite;
+    transform-origin:center;user-select:none;
+    -webkit-user-select:none}
+  .page-flowers .c{font-size:30px;transform:translate(-50%,-50%)}
+  .page-flowers .e{font-size:19px;transform:translate(-50%,-50%)}
+  .page-flowers span:nth-child(odd){animation-delay:-1.2s}
+  .page-flowers span:nth-child(3n){animation-delay:-2.4s}
+  .page-flowers span:nth-child(4n){animation-delay:-3.6s}
+
+  @keyframes flowerSway{
+    0%,100%{transform:translate(-50%,-50%) rotate(-10deg) scale(1)}
+    50%    {transform:translate(-50%,-50%) rotate(10deg) scale(1.12)}}
 
   /* ═══ HEADER ═══ */
   h1.love-title{font-family:'Great Vibes',cursive !important;text-align:center;font-size:5.5rem;
@@ -459,10 +485,16 @@ st.markdown("""
     .tl-hover-text{font-size:1.3rem}.gallery{grid-template-columns:1fr}
     h1.love-title{font-size:3.6rem;-webkit-text-stroke:3px #fff}
     .love-note-text{font-size:2.9rem}.love-note-sub{font-size:.95rem;letter-spacing:.25em}
-    .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}}
+    .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}
+    .page-frame{top:5px !important;right:5px !important;bottom:5px !important;left:5px !important;
+      padding:5px;border-radius:18px}
+    .page-flowers{top:5px !important;right:5px !important;bottom:5px !important;left:5px !important;
+      border-radius:18px}
+    .page-flowers .c{font-size:20px}
+    .page-flowers .e{font-size:13px}}
   @media (prefers-reduced-motion: reduce){
     .soft-glow,.bokeh,.bubble,.leaf,.petal,.dot,.tl-heart,.ending-heart,.ending-dots,
-    .love-note-text,.ld-heart,.ld-bar-fill{animation:none !important}}
+    .love-note-text,.ld-heart,.ld-bar-fill,.page-frame,.page-flowers span{animation:none !important}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -474,8 +506,45 @@ MOMENTS = _load()
 
 _loader.empty()   # <-- remove the skeleton as soon as data is ready
 
-# ── PWA + OFFLINE + PARALLAX + TILT + CONFETTI ────────────────────────────
+# ── BACKGROUND + FLOWER FRAME + PWA + OFFLINE + JS INTERACTIONS ──────────
 st.markdown(PARTICLES, unsafe_allow_html=True)
+
+# ── FLOWER FRAME — injected into parent body so position:fixed works ──────
+components.html("""<script>
+(function(){
+  const p = window.parent.document;
+
+  /* Remove old instances on Streamlit reruns */
+  ['avrav-frame','avrav-flowers'].forEach(id => {
+    const el = p.getElementById(id); if (el) el.remove();
+  });
+
+  /* Colourful gradient frame */
+  const frame = p.createElement('div');
+  frame.id = 'avrav-frame';
+  frame.className = 'page-frame';
+  p.body.appendChild(frame);
+
+  /* Flowers along the frame */
+  const flowers = p.createElement('div');
+  flowers.id = 'avrav-flowers';
+  flowers.className = 'page-flowers';
+  const spots = [
+    ['c','top:0;left:0','🌸'],  ['c','top:0;right:0','🌺'],
+    ['c','bottom:0;left:0','🌻'], ['c','bottom:0;right:0','🌷'],
+    ['e','top:0;left:25%','🌺'], ['e','top:0;left:50%','🌸'],
+    ['e','top:0;left:75%','🌷'],
+    ['e','bottom:0;left:25%','🌸'], ['e','bottom:0;left:50%','🌺'],
+    ['e','bottom:0;left:75%','🌻'],
+    ['e','top:33%;left:0','🌷'], ['e','top:66%;left:0','🌸'],
+    ['e','top:33%;right:0','🌺'], ['e','top:66%;right:0','🌻'],
+  ];
+  flowers.innerHTML = spots.map(([cls, style, e]) =>
+    '<span class="' + cls + '" style="' + style + '">' + e + '</span>'
+  ).join('');
+  p.body.appendChild(flowers);
+})();
+</script>""", height=0)
 
 components.html("""<script>
 (function(){
@@ -621,14 +690,6 @@ if not _readonly:
             st.session_state.show_add = True
             st.session_state.edit = st.session_state.del_mode = False
             st.query_params.clear(); st.rerun()
-else:
-    st.markdown(
-        '<div style="text-align:center;margin-bottom:6px">'
-        '<span class="mode-pill ' + ('share' if _share else '') + '">'
-        '<span class="dot"></span>'
-        + ('Shared Moment View' if _share else 'Public Read-Only View') +
-        '</span></div>',
-        unsafe_allow_html=True)
 
 # ── Header ─────────────────────────────────────────────────────────────────
 st.markdown('<h1 class="love-title">Our Love Diary</h1>', unsafe_allow_html=True)
@@ -713,21 +774,9 @@ if st.session_state.show_add and not _readonly:
 elif active and active in MOMENTS:
     m = norm(MOMENTS[active])
 
-    # top row: back + (edit/delete + share) unless readonly
     if _readonly:
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            if st.button("← Back to timeline", key="back_d"):
-                st.query_params.clear(); st.rerun()
-        with c2:
-            # Share copy hint
-            st.markdown(
-                '<div style="text-align:right;padding-top:8px">'
-                '<span style="font-family:Inter,sans-serif;font-size:.78rem;'
-                'font-weight:700;color:#04160C;opacity:.7">'
-                'Copy URL to share ↑'
-                '</span></div>',
-                unsafe_allow_html=True)
+        if st.button("← Back to timeline", key="back_d"):
+            st.query_params.clear(); st.rerun()
     else:
         cb_, _, ce, cd = st.columns([3, 4, 1.2, 1.2])
         if cb_.button("← Back to timeline", key="back_d"):
