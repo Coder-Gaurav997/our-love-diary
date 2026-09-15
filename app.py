@@ -32,7 +32,6 @@ START, PWD = "2026-05-01", "gaurav&avni"
 EMOJIS = ["💖","💌","🌙","☕","💗","✈️","💍","🌸","🎂","🎄","🌊","⭐","🎁","✨"]
 DEFAULTS = {"title": "Untitled Moment", "date": "—", "emoji": "💖", "about": "", "images": []}
 
-# Ambient tint per emoji (very light)
 AMBIENT = {
     "💖":("rgba(255,200,220,.35)","rgba(255,140,190,.20)"),
     "💌":("rgba(255,220,200,.35)","rgba(255,170,150,.20)"),
@@ -68,14 +67,14 @@ REASONS = [
     "The way you hold my hand a little tighter when you're nervous.",
 ]
 
-for k in ("show_add", "unlocked", "edit", "del_mode", "reason_idx"):
-    st.session_state.setdefault(k, False if k != "reason_idx" else 0)
+for k in ("show_add", "unlocked", "edit", "del_mode"):
+    st.session_state.setdefault(k, False)
 
 # ── IMAGE COMPRESSION ──────────────────────────────────────────────────────
 def _compress(data: bytes, max_side: int = 1920, quality: int = 85) -> bytes:
     try:
         img = Image.open(io.BytesIO(data))
-        if img.mode in ("RGBA", "P") and not img.mode == "RGB":
+        if img.mode in ("RGBA", "P"):
             bg = Image.new("RGB", img.size, (255, 255, 255))
             bg.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
             img = bg
@@ -116,10 +115,10 @@ def _key_for(title, existing):
     return key
 
 def _upload(f):
-    ext = (pathlib.Path(f.name).suffix.lower() or ".jpg")[:8]
     name = f"{uuid.uuid4().hex}.jpg"
     try:
         raw = bytes(f.getbuffer())
+        ext = (pathlib.Path(f.name).suffix.lower() or ".jpg")[:8]
         if ext in (".jpg", ".jpeg", ".png", ".webp"):
             raw = _compress(raw)
         supabase.storage.from_(BUCKET).upload(
@@ -271,7 +270,7 @@ st.markdown("""
   .to-top-heart:active{transform:scale(.95)}
   @media (max-width:680px){.to-top-heart{width:48px;height:48px;bottom:18px;right:18px;font-size:1.25rem}}
 
-  /* ═══ MINI-MAP (right rail of dots) ═══ */
+  /* ═══ MINI-MAP ═══ */
   .mini-map{position:fixed;top:50%;right:16px;transform:translateY(-50%);
     z-index:9997;display:flex;flex-direction:column;gap:8px;
     padding:12px 10px;border-radius:999px;
@@ -285,8 +284,7 @@ st.markdown("""
     box-shadow:0 0 10px rgba(194,24,91,.8)}
   @media (max-width:820px){.mini-map{display:none}}
 
-  /* ═══ SEARCH BAR ═══ */
-  .search-row{margin:8px auto 18px auto;max-width:720px}
+  /* ═══ SEARCH ═══ */
   .search-hint{text-align:center;font-family:'Cormorant Garamond',serif;
     font-style:italic;font-weight:700;font-size:.95rem;color:#0B2E1A;
     margin-top:8px;opacity:.75}
@@ -411,7 +409,7 @@ st.markdown("""
   .no-photo-emoji{font-size:3rem;display:block;margin-bottom:10px}
   .no-photo-text{font-family:'Lora',serif;font-style:italic;font-size:1.1rem;color:#04160C}
 
-  /* ═══ ENDING + NOTE ═══ */
+  /* ═══ ENDING ═══ */
   .ending-card{max-width:720px;margin:30px auto 20px auto;padding:34px 40px;border-radius:24px;
     text-align:center;position:relative;overflow:hidden;border-style:dashed;
     animation:fadeInUp 1s .6s cubic-bezier(.2,.8,.2,1) both}
@@ -423,43 +421,42 @@ st.markdown("""
   .ending-dots{margin-top:16px;letter-spacing:1em;font-size:1.5rem;color:#c2185b;
     animation:fadeInOut 2.6s ease-in-out infinite}
 
-  /* ═══ REASONS SLIDER ═══ */
-  .reasons-wrap{max-width:920px;margin:20px auto 6px auto;padding:26px 24px 20px 24px;
+  /* ═══ REASONS — SKIN-TONE INTERIOR ═══ */
+  .reasons-wrap{max-width:920px;margin:20px auto 6px auto;padding:28px 24px 22px 24px;
     border-radius:24px;position:relative;overflow:hidden;
-    background:rgba(255,255,255,.94);border:2px solid #0B2E1A;
-    box-shadow:0 14px 36px rgba(11,46,26,.35);
+    background:linear-gradient(135deg,#fbe3cd 0%,#f8dcc0 55%,#f5d3b3 100%);
+    border:2px solid #0B2E1A;
+    box-shadow:0 14px 36px rgba(11,46,26,.35),inset 0 1px 0 rgba(255,255,255,.7);
     animation:fadeInUp 1s .7s cubic-bezier(.2,.8,.2,1) both}
-  .reasons-head{text-align:center;font-family:'Great Vibes',cursive;font-size:2.4rem;
-    color:#0B2E1A;margin:0 0 4px 0;text-shadow:0 2px 8px rgba(194,24,91,.25)}
-  .reasons-sub{text-align:center;font-family:'Cormorant Garamond',serif;
-    font-style:italic;font-weight:700;font-size:.95rem;letter-spacing:.25em;
-    text-transform:uppercase;color:#7a0a1e;margin:0 0 18px 0;opacity:.8}
+  .reasons-head{text-align:center;font-family:'Great Vibes',cursive;font-size:2.6rem;
+    color:#0a0704;margin:0 0 20px 0;
+    text-shadow:0 2px 8px rgba(122,10,30,.25),0 1px 0 rgba(255,255,255,.5)}
   .reasons-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
     scroll-behavior:smooth;gap:16px;padding:6px 4px 14px 4px;
     -ms-overflow-style:none;scrollbar-width:none}
   .reasons-track::-webkit-scrollbar{display:none}
   .reason-card{flex:0 0 82%;max-width:82%;scroll-snap-align:center;
     padding:22px 26px;border-radius:20px;
-    background:linear-gradient(135deg,#fff0f6 0%,#ffe4ee 100%);
+    background:linear-gradient(135deg,#fff4e8 0%,#fbe1c8 100%);
     border:2px solid #7a0a1e;
-    box-shadow:0 10px 26px rgba(122,10,30,.25);
+    box-shadow:0 10px 26px rgba(122,10,30,.25),inset 0 1px 0 rgba(255,255,255,.85);
     font-family:'Lora',serif;font-style:italic;font-weight:600;
     font-size:1.15rem;line-height:1.65;color:#3a020f;text-align:center}
   .reason-card .rnum{display:block;font-family:'Cormorant Garamond',serif;
     font-weight:800;font-size:.72rem;letter-spacing:.3em;color:#c2185b;
     text-transform:uppercase;margin-bottom:10px;opacity:.85}
-  .reasons-nav{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:6px}
+  .reasons-nav{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:8px}
   .reasons-btn{background:linear-gradient(135deg,#0d3b25 0%,#1c6b3f 55%,#2e9e63 100%);
     border:2px solid #062b18;color:#fff;
-    width:44px;height:44px;border-radius:50%;
-    font-size:1.15rem;font-weight:700;cursor:pointer;
+    width:46px;height:46px;border-radius:50%;
+    font-size:1.2rem;font-weight:700;cursor:pointer;
     box-shadow:0 6px 16px rgba(6,43,24,.5);
     transition:transform .2s ease,box-shadow .2s ease;
     display:flex;align-items:center;justify-content:center;
     padding:0;line-height:1}
-  .reasons-btn:hover{transform:translateY(-2px) scale(1.06);
+  .reasons-btn:hover{transform:translateY(-2px) scale(1.08);
     box-shadow:0 10px 24px rgba(6,43,24,.7)}
-  .reasons-btn:active{transform:scale(.95)}
+  .reasons-btn:active{transform:scale(.94)}
   .reasons-count{font-family:'Inter',sans-serif;font-weight:700;font-size:.82rem;
     color:#3a020f;letter-spacing:.1em;min-width:56px;text-align:center}
 
@@ -570,7 +567,7 @@ st.markdown("""
     .love-note-text{font-size:2.9rem}.love-note-sub{font-size:.95rem;letter-spacing:.25em}
     .add-title,[data-testid="stMarkdownContainer"] h2.add-title{font-size:2.1rem !important}
     .reason-card{flex:0 0 92%;max-width:92%;font-size:1.02rem;padding:18px 20px}
-    .reasons-head{font-size:2rem}}
+    .reasons-head{font-size:2.1rem}}
   @media (prefers-reduced-motion: reduce){
     .soft-glow,.bokeh,.bubble,.leaf,.petal,.dot,.tl-heart,.ending-heart,.ending-dots,
     .love-note-text,.ld-heart,.ld-bar-fill{animation:none !important}}
@@ -721,6 +718,24 @@ components.html("""<script>
     }
   }, { passive: true });
 
+  /* ── REASONS SLIDER BUTTONS ───────────────────────────────── */
+  function attachReasons() {
+    const track = p.getElementById('reasonsTrack');
+    const prev  = p.getElementById('reasonsPrev');
+    const next  = p.getElementById('reasonsNext');
+    if (!track || !prev || !next) return false;
+    const step = () => track.clientWidth * 0.84;
+    prev.onclick = () => track.scrollBy({ left: -step(), behavior: 'smooth' });
+    next.onclick = () => track.scrollBy({ left:  step(), behavior: 'smooth' });
+    return true;
+  }
+  if (!attachReasons()) {
+    let tries = 0;
+    const t = setInterval(() => {
+      if (attachReasons() || ++tries > 30) clearInterval(t);
+    }, 100);
+  }
+
   window.parent.postMessage({ isStreamlitMessage: true,
     type: 'streamlit:setFrameHeight', height: 0 }, '*');
 })();
@@ -733,7 +748,6 @@ if not _readonly:
         if st.button("🎲 Surprise me", key="rand_btn", use_container_width=True):
             if MOMENTS:
                 st.query_params["m"] = random.choice(list(MOMENTS.keys()))
-                st.query_params["r"] = str(random.randint(0, 999))
                 st.rerun()
     with c2:
         if st.button("✚ Add Moment", key="add_btn", use_container_width=True):
@@ -818,13 +832,11 @@ if st.session_state.show_add and not _readonly:
                         st.success(f"Saved “{title}” 💖")
                         st.session_state.show_add = st.session_state.unlocked = False; st.rerun()
                     else:
-                        st.warning("Couldn't save — you may be offline. Try again when connected.")
+                        st.warning("Couldn't save — you may be offline.")
 
 # ═══ 2) DETAIL PAGE ════════════════════════════════════════════════════════
 elif active and active in MOMENTS:
     m = norm(MOMENTS[active])
-
-    # ── PREV / NEXT navigation ─────────────────────────────────────
     slugs = list(MOMENTS.keys())
     idx = slugs.index(active)
     prev_slug = slugs[idx - 1] if idx > 0 else None
@@ -918,7 +930,6 @@ elif active and active in MOMENTS:
                 st.session_state.edit = st.session_state.unlocked = False; st.rerun()
         st.stop()
 
-    # Ambient theme for detail view
     tint = AMBIENT.get(m["emoji"], AMBIENT["💖"])
     imgs = [p for p in imgs_of(m) if p]
     if len(imgs) == 1:
@@ -939,7 +950,6 @@ elif active and active in MOMENTS:
       <div class="detail-about"><span class="detail-label">Our Story</span>{story}</div>
     </div>""", unsafe_allow_html=True)
 
-    # Bottom prev/next
     if prev_slug or next_slug:
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
         cp, cm, cn = st.columns([2, 1, 2])
@@ -963,7 +973,7 @@ else:
             to write the very first page of our diary.</div>
           <div class="empty-hint">✚ Add Moment</div></div>""", unsafe_allow_html=True)
     else:
-        # ── SEARCH BAR ──────────────────────────────────────────────
+        # ── SEARCH ──────────────────────────────────────────────
         with st.form("search_form", clear_on_submit=False):
             sc1, sc2 = st.columns([5, 1])
             with sc1:
@@ -974,29 +984,24 @@ else:
             with sc2:
                 submitted = st.form_submit_button("Go", use_container_width=True)
             if submitted:
-                if q.strip():
-                    st.query_params["q"] = q.strip()
-                else:
-                    st.query_params.pop("q", None)
+                if q.strip(): st.query_params["q"] = q.strip()
+                else: st.query_params.pop("q", None)
                 st.rerun()
 
-        # Filter
         if _search:
             sl = _search.lower()
             filtered = {k: v for k, v in MOMENTS.items()
                         if sl in (v.get("title") or "").lower()
                         or sl in (v.get("about") or "").lower()}
             st.markdown(
-                f'<div class="search-hint">'
-                f'Showing <b>{len(filtered)}</b> of {len(MOMENTS)} '
+                f'<div class="search-hint">Showing <b>{len(filtered)}</b> of {len(MOMENTS)} '
                 f'for “{_search}” &nbsp;·&nbsp; '
-                f'<a href="?" style="color:#c2185b;text-decoration:underline">clear</a>'
-                f'</div>',
+                f'<a href="?" style="color:#c2185b;text-decoration:underline">clear</a></div>',
                 unsafe_allow_html=True)
         else:
             filtered = MOMENTS
 
-        # ── TIMELINE ────────────────────────────────────────────────
+        # ── TIMELINE ────────────────────────────────────────────
         if not filtered:
             st.markdown('<div class="empty-state"><span class="empty-emoji">🔍</span>'
                         '<div class="empty-title">No moments match</div>'
@@ -1019,7 +1024,6 @@ else:
                 for i, (k, m) in enumerate(filtered.items()))
             st.markdown(f'<div class="timeline">{items}</div>', unsafe_allow_html=True)
 
-            # ── MINI-MAP (only when not filtering) ──────────────────
             if not _search:
                 dots = "".join(f'<a href="?m={k}" title="{norm(m)["title"][:30]}"></a>'
                                for k, m in filtered.items())
@@ -1037,20 +1041,19 @@ else:
             unsafe_allow_html=True,
         )
 
-        # ── REASONS SLIDER (left to right) ──────────────────────────
+        # ── REASONS SLIDER (skin-toned, dark title, working buttons) ──
         reasons_html = "".join(
             f'<div class="reason-card"><span class="rnum">Reason {i+1}</span>{r}</div>'
             for i, r in enumerate(REASONS)
         )
         st.markdown(
             f'<div class="reasons-wrap">'
-            f'<h2 class="reasons-head">Reasons I Love You</h2>'
-            f'<div class="reasons-sub">— swipe left &nbsp;·&nbsp; right —</div>'
+            f'<h2 class="reasons-head">Reasons Why I Love You</h2>'
             f'<div class="reasons-track" id="reasonsTrack">{reasons_html}</div>'
             f'<div class="reasons-nav">'
-            f'<button class="reasons-btn" onclick="(function(){{var t=document.getElementById(\'reasonsTrack\');t.scrollBy({{left:-t.clientWidth*0.84,behavior:\'smooth\'}});}})()">←</button>'
+            f'<button type="button" class="reasons-btn" id="reasonsPrev">←</button>'
             f'<span class="reasons-count">✦</span>'
-            f'<button class="reasons-btn" onclick="(function(){{var t=document.getElementById(\'reasonsTrack\');t.scrollBy({{left:t.clientWidth*0.84,behavior:\'smooth\'}});}})()">→</button>'
+            f'<button type="button" class="reasons-btn" id="reasonsNext">→</button>'
             f'</div>'
             f'</div>',
             unsafe_allow_html=True,
