@@ -428,9 +428,15 @@ st.markdown("""
     border:2px solid #0B2E1A;
     box-shadow:0 14px 36px rgba(11,46,26,.35),inset 0 1px 0 rgba(255,255,255,.7);
     animation:fadeInUp 1s .7s cubic-bezier(.2,.8,.2,1) both}
-  .reasons-head{text-align:center;font-family:'Great Vibes',cursive;font-size:2.6rem;
-    color:#14532D;margin:0 0 20px 0;
-    text-shadow:0 2px 8px rgba(122,10,30,.25),0 1px 0 rgba(255,255,255,.5)}
+  .reasons-head{
+    text-align:center;
+    font-family:'Great Vibes',cursive;
+    font-size:2.8rem;
+    color:#0a0704;
+    margin:0 0 20px 0;
+    -webkit-text-stroke:0.8px #0a0704;
+    text-shadow:0 2px 6px rgba(122,10,30,.35);
+}
   .reasons-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
     scroll-behavior:smooth;gap:16px;padding:6px 4px 14px 4px;
     -ms-overflow-style:none;scrollbar-width:none}
