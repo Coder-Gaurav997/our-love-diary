@@ -1,4 +1,3 @@
-"""🌿 Avrav Love Diary — Supabase edition (rich features)."""
 import io, pathlib, random, uuid
 from datetime import datetime
 import streamlit as st
